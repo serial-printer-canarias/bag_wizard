@@ -1,68 +1,99 @@
-/* Previsualización del logo sobre la imagen del producto */
-(function () {
-  'use strict';
-  function $(s){ return document.querySelector(s); }
+(function(){
+  // Rutas relativas para GitHub Pages (sirve igual en local)
+  const ROOT = './';
+  const TX = {
+    smooth: ROOT + 'assets/textures/leather_smooth.jpg',
+    suede:  ROOT + 'assets/textures/leather_suede.jpg',
+  };
+  const SVG = ROOT + 'assets/svg/bag_base.svg';
 
-  function init(){
-    const canvas = $('#spw_canvas');
-    if (!canvas) return;
+  const $ = (s,c=document)=>c.querySelector(s);
+  const ui = {
+    texA: $('#texA'), colA: $('#colA'),
+    texB: $('#texB'), colB: $('#colB'),
+    dl: $('#dl'), save: $('#save'),
+    hidden: $('#spbc_config_json')
+  };
 
-    const logoInput = $('#spw_logo_input');     // <input type="file" ... id="spw_logo_input">
-    const logoImg   = $('#spw_logo_preview');   // <img id="spw_logo_preview">
-    const sizeEl    = $('#spw_size');
-    const posXEl    = $('#spw_pos_x');
-    const posYEl    = $('#spw_pos_y');
-    const rotEl     = $('#spw_rotation');
+  const canvas = new fabric.Canvas('cv', { selection:false, hoverCursor:'pointer' });
 
-    const state = {
-      widthPct: parseInt((sizeEl && sizeEl.value) || '100', 10),
-      dxPct:    parseInt((posXEl && posXEl.value) || '0',   10),
-      dyPct:    parseInt((posYEl && posYEl.value) || '10',  10),
-      rotDeg:   parseInt((rotEl  && rotEl.value)  || '0',   10),
-    };
+  let map = {};                 // objetos por id
+  let imgSmooth=null, imgSuede=null;
 
-    function applyTransform(){
-      if (!logoImg) return;
-      logoImg.style.position = 'absolute';
-      logoImg.style.left     = (50 + state.dxPct) + '%';
-      logoImg.style.top      = (50 + state.dyPct) + '%';
-      logoImg.style.width    = state.widthPct + '%';
-      logoImg.style.transform= 'translate(-50%, -50%) rotate(' + state.rotDeg + 'deg)';
-      logoImg.style.zIndex   = '999';
-      logoImg.style.opacity  = '1';
-      logoImg.classList.remove('d-none');
-    }
-
-    // Controles
-    if (sizeEl) sizeEl.addEventListener('input', () => { state.widthPct = parseInt(sizeEl.value || '100', 10); applyTransform(); });
-    if (posXEl) posXEl.addEventListener('input', () => { state.dxPct    = parseInt(posXEl.value || '0',   10); applyTransform(); });
-    if (posYEl) posYEl.addEventListener('input', () => { state.dyPct    = parseInt(posYEl.value || '10',  10); applyTransform(); });
-    if (rotEl)  rotEl.addEventListener('input', () => { state.rotDeg   = parseInt(rotEl.value  || '0',   10); applyTransform(); });
-
-    // Subida de logo (siempre FileReader para máxima compatibilidad)
-    if (logoInput && logoImg) {
-      logoInput.addEventListener('change', (ev) => {
-        const file = ev.target.files && ev.target.files[0];
-        if (!file) return;
-
-        if (file.size > 10 * 1024 * 1024) { alert('El archivo supera 10MB.'); return; }
-        const mime = (file.type || '').toLowerCase();
-        if (!mime.startsWith('image/')) { alert('Formato no soportado. Usa PNG, JPG o SVG.'); return; }
-
-        const reader = new FileReader();
-        reader.onload = (e) => {
-          logoImg.src = e.target.result;        // dataURL
-          logoImg.removeAttribute('loading');
-          logoImg.decoding = 'sync';
-          applyTransform();
-          try { logoImg.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch(e) {}
-        };
-        reader.readAsDataURL(file);
-      });
-    }
-
-    applyTransform();
+  function loadImg(src){
+    return new Promise((res,rej)=>{ const i=new Image(); i.crossOrigin='anonymous'; i.onload=()=>res(i); i.onerror=rej; i.src=src; });
   }
 
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
+  function tintPattern(img, hex){
+    const S=512, off=document.createElement('canvas'); off.width=S; off.height=S;
+    const ctx=off.getContext('2d');
+    ctx.drawImage(img,0,0,S,S);
+    ctx.globalCompositeOperation='multiply'; ctx.fillStyle=hex||'#ffffff'; ctx.fillRect(0,0,S,S);
+    ctx.globalCompositeOperation='destination-over'; ctx.fillStyle='#fff'; ctx.fillRect(0,0,S,S);
+    return new fabric.Pattern({ source: off, repeat:'repeat' });
+  }
+
+  function walk(objs){
+    objs.forEach(o=>{
+      if (o.id) map[o.id]=o;
+      if (o._objects) walk(o._objects);
+    });
+  }
+
+  function setFillDeep(obj, fill){
+    if (!obj) return;
+    if (obj._objects && obj._objects.length){
+      obj._objects.forEach(ch => setFillDeep(ch, fill));
+    } else if ('fill' in obj) {
+      obj.set('fill', fill);
+    }
+  }
+
+  function texImg(key){ return key==='smooth' ? imgSmooth : imgSuede; }
+
+  function apply(){
+    if (!map['stripe1'] || !map['stripe2'] || !imgSmooth || !imgSuede) return;
+    const patA = tintPattern(texImg(ui.texA.value), ui.colA.value);
+    const patB = tintPattern(texImg(ui.texB.value), ui.colB.value);
+    setFillDeep(map['stripe1'], patA);
+    setFillDeep(map['stripe2'], patB);
+    canvas.renderAll();
+  }
+
+  // Carga assets
+  Promise.all([loadImg(TX.smooth), loadImg(TX.suede)]).then(([a,b])=>{
+    imgSmooth=a; imgSuede=b; apply();
+  });
+
+  fabric.loadSVGFromURL(SVG, (objs, opt)=>{
+    const group = fabric.util.groupSVGElements(objs, opt);
+    group.selectable=false;
+    canvas.add(group);
+    walk(group._objects ? group._objects : [group]);
+    apply();
+  }, (item, obj)=>{ obj.selectable=false; });
+
+  // UI
+  ['change','input'].forEach(ev=>{
+    ui.texA.addEventListener(ev, apply);
+    ui.colA.addEventListener(ev, apply);
+    ui.texB.addEventListener(ev, apply);
+    ui.colB.addEventListener(ev, apply);
+  });
+
+  ui.dl.addEventListener('click', ()=>{
+    const data = canvas.toDataURL({ format:'png', multiplier:1.5 });
+    const a=document.createElement('a'); a.href=data; a.download='bolso-preview.png'; a.click();
+  });
+
+  ui.save.addEventListener('click', ()=>{
+    const cfg = {
+      model: 'bucket-01',
+      stripe1: { texture: ui.texA.value, color: ui.colA.value },
+      stripe2: { texture: ui.texB.value, color: ui.colB.value },
+      version: '1.0.0'
+    };
+    ui.hidden.value = JSON.stringify(cfg);
+    alert(ui.hidden.value); // muestra JSON
+  });
 })();
