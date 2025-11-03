@@ -10,6 +10,7 @@
   const ui={
     texA:$('#texA'), colA:$('#colA'),
     texB:$('#texB'), colB:$('#colB'),
+    // --- Grupo C (costura) ---
     stitch: $('#stitchColor'),
     dl:$('#dl'), save:$('#save'), hidden:$('#spbc_config_json')
   };
@@ -27,47 +28,40 @@
 
   let mode=''; // 'ids' | 'auto-mix' | 'auto-geom'
   let bucketA=[], bucketB=[];
-  let outlineSet=new Set();
+  let outlineSet=new Set(); // hojas que son contorno/detalle
+  // --- Grupo C (costura) ---
   let stitchSet=new Set();
+
   let imgSmooth=null, imgSuede=null;
 
   // ---------- helpers ----------
-  // ⬇️ NUEVO: iguala el tamaño interno del canvas al tamaño visible
   function syncCanvasSize(){
     const w = Math.max(1, cvEl.clientWidth || W);
     const h = Math.max(1, cvEl.clientHeight || H);
     canvas.setDimensions({ width:w, height:h }, { backstoreOnly:false });
   }
 
-  // ⬇️ REESCRITO: encaja usando viewport (NO escala el grupo)
+  // ⚠️ USAR SIEMPRE MEDIDAS ORIGINALES DEL GRUPO (no acumuladas)
   function fit(g){
     if(!g) return;
-    // Medimos el grupo en coordenadas "mundo" (sin viewport)
-    const oldVPT = canvas.viewportTransform ? canvas.viewportTransform.slice() : [1,0,0,1,0,0];
-    canvas.setViewportTransform([1,0,0,1,0,0]);
-    canvas.renderAll();
-    g.setCoords();
-    const b = g.getBoundingRect(true,true); // incluye strokes/transforms
-    // Restauramos VPT antes de calcular zoom
-    canvas.setViewportTransform(oldVPT);
-
     const CW = canvas.getWidth(), CH = canvas.getHeight();
-    const m = Math.round(Math.min(CW,CH)*0.04); // ~4% de margen
-    const availW = Math.max(1, CW - 2*m);
-    const availH = Math.max(1, CH - 2*m);
+    const m  = Math.round(Math.min(CW,CH)*0.04); // ~4% margen
+    const maxW = Math.max(1, CW - 2*m), maxH = Math.max(1, CH - 2*m);
 
-    const bw = Math.max(1, b.width);
-    const bh = Math.max(1, b.height);
-    const zoom = Math.min(availW / bw, availH / bh);
+    // Baseline guardado al cargar el SVG:
+    const w0 = g.__w0 || g.width  || g.getScaledWidth()  || 1;
+    const h0 = g.__h0 || g.height || g.getScaledHeight() || 1;
 
-    const cx = CW/2, cy = CH/2;
-    const bx = b.left + b.width/2;
-    const by = b.top  + b.height/2;
+    const s = Math.min(maxW / w0, maxH / h0);
 
-    // VPT = [zoom,0,0,zoom, tx, ty] centrando el grupo
-    const tx = cx - bx*zoom;
-    const ty = cy - by*zoom;
-    canvas.setViewportTransform([zoom,0,0,zoom,tx,ty]);
+    // Reset de escala y posición SIEMPRE contra baseline
+    g.set({
+      scaleX:s, scaleY:s,
+      left:(CW - w0*s)/2,
+      top:(CH - h0*s)/2,
+      selectable:false, evented:false
+    });
+    g.setCoords();
     canvas.requestRenderAll();
   }
 
@@ -105,6 +99,7 @@
   }
   const luma=rgb=>0.2126*rgb[0]+0.7152*rgb[1]+0.0722*rgb[2];
   const nearGray=([r,g,b],tol=22)=>Math.abs(r-g)<tol&&Math.abs(r-b)<tol&&Math.abs(g-b)<tol;
+
   function hasVisibleFill(o){
     if(!('fill' in o) || !o.fill) return false;
     if(o.fill==='none') return false;
@@ -113,6 +108,8 @@
     return a>0.02;
   }
   function hasStroke(o){ return ('stroke' in o) && o.stroke && o.stroke!=='none'; }
+
+  // Heurística de contorno:
   function isOutlineStroke(o){
     if(hasVisibleFill(o)) return false;
     if(!hasStroke(o)) return false;
@@ -213,7 +210,7 @@
   }
   const applyFill=(o,mat)=>{ if('fill' in o) o.set('fill',mat); else o.fill=mat; };
 
-  // --------- OUTLINE ----------
+  // --------- OUTLINE: detectar y fijar estilo ----------
   function styleAndCollectOutlines(root){
     outlineSet=new Set();
     const areaRoot = (root.getScaledWidth?.()||getW(root)) * (root.getScaledHeight?.()||getH(root)) || (W*H);
@@ -248,7 +245,7 @@
     });
   }
 
-  // --------- STITCH ----------
+  // --------- STITCH: detectar grupo de costura (C) y fijar estilo base ----------
   function collectStitch(root){
     stitchSet = new Set();
     const ids=idsMap(root._objects?root._objects:[root]);
@@ -258,6 +255,7 @@
     const leaves = leafs(gStitch);
     leaves.forEach(o=>{
       stitchSet.add(o);
+      // estilo base de puntada (solo trazo)
       o.set({
         fill: 'none',
         stroke: ui.stitch?.value || '#2a2a2a',
@@ -272,10 +270,13 @@
     const parent = gStitch.group || root; bringChildToTop(parent, gStitch);
   }
 
-  // --------- buckets ----------
+  // --------- buckets pintables ----------
   function buildBuckets(root){
     const allLeaves = leafs(root);
+    // NO pintar outline ni costura
     const paintables = allLeaves.filter(o=>!outlineSet.has(o) && !stitchSet.has(o));
+
+    // 1) ids stripe1/stripe2
     const ids=idsMap(root._objects?root._objects:[root]);
     if(ids['stripe1'] && ids['stripe2']){
       const A=leafs(ids['stripe1']).filter(o=>!outlineSet.has(o) && !stitchSet.has(o));
@@ -286,12 +287,16 @@
         return;
       }
     }
+
+    // 2) color+posición
     const mix=kmeans2_mix(paintables);
     if(mix.A.length && mix.B.length){
       bucketA=mix.A; bucketB=mix.B; mode='auto-mix';
       dbg.innerHTML=`✅ SVG cargado (modo <b>auto-mix</b>) · A: ${bucketA.length} · B: ${bucketB.length} · stitch: ${stitchSet.size} · outline: ${outlineSet.size}`;
       return;
     }
+
+    // 3) geom por X
     const [AX,BX]=kmeans2X(paintables);
     bucketA=AX; bucketB=BX; mode='auto-geom';
     dbg.innerHTML=`✅ SVG cargado (modo <b>auto-geom</b>) · A: ${AX.length} · B: ${BX.length} · stitch: ${stitchSet.size} · outline: ${outlineSet.size}`;
@@ -306,6 +311,7 @@
     bucketA.forEach(o=>{ applyFill(o, patA); o.dirty=true; });
     bucketB.forEach(o=>{ applyFill(o, patB); o.dirty=true; });
 
+    // reafirmar contorno encima y negro
     outlineSet.forEach(o=>{
       if(hasStroke(o) || !hasVisibleFill(o)){
         o.set({fill:'none', stroke:'#111'});
@@ -316,6 +322,7 @@
       o.dirty=true;
     });
 
+    // --- pintar costura (C) como color liso de trazo ---
     if(ui.stitch){
       const sc = ui.stitch.value || '#2a2a2a';
       stitchSet.forEach(o=>{
@@ -334,18 +341,23 @@
 
   fabric.loadSVGFromURL(SVG,(objs,opts)=>{
     const root=fabric.util.groupSVGElements(objs,opts);
-    rootRef = root;
+    // Guarda baseline una sola vez (MEDIDAS ORIGINALES DEL SVG)
+    root.__w0 = root.width;
+    root.__h0 = root.height;
 
-    // 1) igualamos tamaño al visible
-    syncCanvasSize();
-    // 2) añadimos el grupo SIN escalarlo
+    rootRef = root;
+    syncCanvasSize();     // iguala tamaño del canvas al visible
     canvas.add(root);
-    // 3) detectores y buckets
+
+    // --- costura (C) ---
     collectStitch(root);
+    // contornos
     styleAndCollectOutlines(root);
+    // buckets A/B (excluyen outline y costura)
     buildBuckets(root);
     paint();
-    // 4) encaje por viewport al tamaño actual
+
+    // encaje inicial contra baseline
     fit(root);
   },(item,obj)=>{ obj.selectable=false; });
 
@@ -355,7 +367,7 @@
     ui.colB.addEventListener(ev, paint);
     ui.texA.addEventListener(ev, paint);
     ui.texB.addEventListener(ev, paint);
-    if(ui.stitch) ui.stitch.addEventListener(ev, paint);
+    if(ui.stitch) ui.stitch.addEventListener(ev, paint); // Grupo C
   });
 
   ui.dl.addEventListener('click', ()=>{
@@ -368,13 +380,14 @@
       mode,
       A:{ texture: ui.texA.value, color: ui.colA.value },
       B:{ texture: ui.texB.value, color: ui.colB.value },
+      // Grupo C (costura)
       C:{ texture:'none', color: ui.stitch ? ui.stitch.value : '#2a2a2a' },
       version:'1.0.1'
     });
     alert(ui.hidden.value);
   });
 
-  // === Responsive: refit cuando cambie el tamaño visible del canvas ===
+  // === Responsive real: si cambia el tamaño visible, refit con baseline ===
   if('ResizeObserver' in window){
     const ro = new ResizeObserver(()=>{
       syncCanvasSize();
