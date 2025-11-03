@@ -16,7 +16,6 @@
   };
 
   const W=600,H=800;
-  const cvEl = document.getElementById('cv');
   const canvas=new fabric.Canvas('cv',{selection:false});
   canvas.setWidth(W); canvas.setHeight(H);
 
@@ -34,37 +33,23 @@
 
   let imgSmooth=null, imgSuede=null;
 
+  // 👉 Ajuste de primera vista (único cambio real)
+  let firstFit = true;
+  const INITIAL_SHRINK = 0.84; // 84% del encaje normal para arrancar más pequeño
+
   // ---------- helpers ----------
-  function syncCanvasSize(){
-    const w = Math.max(1, cvEl.clientWidth || W);
-    const h = Math.max(1, cvEl.clientHeight || H);
-    canvas.setDimensions({ width:w, height:h }, { backstoreOnly:false });
-  }
-
-  // ⚠️ USAR SIEMPRE MEDIDAS ORIGINALES DEL GRUPO (no acumuladas)
   function fit(g){
-    if(!g) return;
-    const CW = canvas.getWidth(), CH = canvas.getHeight();
-    const m  = Math.round(Math.min(CW,CH)*0.04); // ~4% margen
-    const maxW = Math.max(1, CW - 2*m), maxH = Math.max(1, CH - 2*m);
+    const m=24,maxW=W-2*m,maxH=H-2*m;
+    const w=g.width||g.getScaledWidth(),h=g.height||g.getScaledHeight();
+    // encaje normal...
+    let s=Math.min(maxW/w,maxH/h);
+    // ...pero en la PRIMERA VEZ lo mostramos más pequeño
+    if (firstFit) s *= INITIAL_SHRINK;
 
-    // Baseline guardado al cargar el SVG:
-    const w0 = g.__w0 || g.width  || g.getScaledWidth()  || 1;
-    const h0 = g.__h0 || g.height || g.getScaledHeight() || 1;
-
-    const s = Math.min(maxW / w0, maxH / h0);
-
-    // Reset de escala y posición SIEMPRE contra baseline
-    g.set({
-      scaleX:s, scaleY:s,
-      left:(CW - w0*s)/2,
-      top:(CH - h0*s)/2,
-      selectable:false, evented:false
-    });
-    g.setCoords();
-    canvas.requestRenderAll();
+    g.scale(s);
+    g.set({left:(W-w*s)/2,top:(H-h*s)/2,selectable:false,evented:false});
+    firstFit = false; // a partir de aquí, encaje normal
   }
-
   function walk(arr,fn){ (function rec(a){ a.forEach(o=>{ fn(o); if(o._objects&&o._objects.length) rec(o._objects); }); })(arr); }
   function leafs(root){ const out=[]; walk([root], o=>{ if(o._objects&&o._objects.length) return; if(o.type==='image') return; out.push(o); }); return out; }
   function idsMap(arr){ const map={}; walk(arr,o=>{ if(o.id) map[o.id]=o; }); return map; }
@@ -337,28 +322,17 @@
 
   Promise.all([loadImg(TX.smooth), loadImg(TX.suede)]).then(([a,b])=>{ imgSmooth=a; imgSuede=b; });
 
-  let rootRef = null;
-
   fabric.loadSVGFromURL(SVG,(objs,opts)=>{
     const root=fabric.util.groupSVGElements(objs,opts);
-    // Guarda baseline una sola vez (MEDIDAS ORIGINALES DEL SVG)
-    root.__w0 = root.width;
-    root.__h0 = root.height;
+    fit(root); canvas.add(root);
 
-    rootRef = root;
-    syncCanvasSize();     // iguala tamaño del canvas al visible
-    canvas.add(root);
-
-    // --- costura (C) ---
+    // --- nuevo: detectar y configurar costura (C) ---
     collectStitch(root);
-    // contornos
+    // existente: contornos
     styleAndCollectOutlines(root);
     // buckets A/B (excluyen outline y costura)
     buildBuckets(root);
     paint();
-
-    // encaje inicial contra baseline
-    fit(root);
   },(item,obj)=>{ obj.selectable=false; });
 
   // UI
@@ -385,18 +359,5 @@
       version:'1.0.1'
     });
     alert(ui.hidden.value);
-  });
-
-  // === Responsive real: si cambia el tamaño visible, refit con baseline ===
-  if('ResizeObserver' in window){
-    const ro = new ResizeObserver(()=>{
-      syncCanvasSize();
-      if (rootRef) fit(rootRef);
-    });
-    ro.observe(cvEl);
-  }
-  window.addEventListener('resize', ()=>{
-    syncCanvasSize();
-    if (rootRef) fit(rootRef);
   });
 })();
