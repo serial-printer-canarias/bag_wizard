@@ -3,16 +3,20 @@
 <head>
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1"/>
-  <title>Bag Wizard (2 stripes)</title>
+  <title>Bag Wizard (2 colores / 2 texturas)</title>
   <style>
+    :root { --gap:16px; }
     body{font-family:system-ui,Segoe UI,Roboto,Arial;background:#fafafa;margin:0;padding:16px}
-    .wrap{display:grid;gap:16px;grid-template-columns:minmax(280px,620px) 1fr;align-items:start}
+    h1{margin:0 0 12px 0;font-size:20px}
+    .wrap{display:grid;gap:var(--gap);grid-template-columns:minmax(280px,620px) 1fr;align-items:start}
     .stage{background:#fff;border:1px solid #e7e7e7;border-radius:12px;padding:8px}
     .controls{display:flex;flex-direction:column;gap:10px}
     .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
-    .actions{display:flex;gap:8px}
+    .row strong{min-width:76px}
+    .actions{display:flex;gap:8px;margin-top:6px}
+    button{cursor:pointer;padding:8px 12px;border-radius:8px;border:1px solid #ccc;background:#fff}
+    .btn-primary{background:#0a7cff;color:#fff;border-color:#0a7cff}
     @media(max-width:900px){.wrap{grid-template-columns:1fr}}
-    button{cursor:pointer}
   </style>
 </head>
 <body>
@@ -44,7 +48,7 @@
 
       <div class="actions">
         <button id="dl">Descargar preview</button>
-        <button id="save">Ver JSON</button>
+        <button id="save" class="btn-primary">Ver JSON</button>
       </div>
       <input type="hidden" id="spbc_config_json" value=""/>
     </div>
@@ -52,6 +56,7 @@
 
   <!-- Fabric.js -->
   <script src="https://cdn.jsdelivr.net/npm/fabric@5.3.0/dist/fabric.min.js"></script>
-  <script src="./js/customizer.js"></script>
+  <!-- Nuestro motor (UN solo archivo) -->
+  <script src="./js/customizer.js?v=7"></script>
 </body>
 </html>
