@@ -7,6 +7,14 @@
     suede:  ROOT + 'assets/textures/leather_suede.jpg',
   };
 
+  // Filtros para modo AUTO (quitan motas/ruido)
+  const AUTO_FILTERS = {
+    MIN_AREA_1: 250,   // px^2 (tras escalar) primer intento
+    MIN_LUMA_1: 35,    // luminancia mínima (0..255)
+    MIN_AREA_2: 40,    // fallback relajado si no encuentra 2 grupos
+    MIN_LUMA_2: 0
+  };
+
   // --- UI ---
   const $ = (s,c=document)=>c.querySelector(s);
   const ui = {
@@ -27,8 +35,8 @@
   dbg.textContent='Cargando…'; document.body.appendChild(dbg);
 
   // --- Estado ---
-  let mode='';               // 'ids' | 'auto'
-  let bucketA=[], bucketB=[]; // arrays de hojas a pintar (solo fill)
+  let mode='';                // 'ids' | 'auto'
+  let bucketA=[], bucketB=[]; // hojas a pintar (solo fill)
   let imgSmooth=null, imgSuede=null;
 
   // --- Helpers ---
@@ -43,7 +51,7 @@
     const out=[]; (function rec(a){ a.forEach(o=>{ if(o._objects&&o._objects.length) rec(o._objects); else out.push(o); }); })(arr);
     return out;
   }
-  function leavesFill(arr){
+  function leavesFill(arr){ // SOLO objetos con fill (ignora strokes e imágenes)
     return leaves(arr).filter(o => ('fill' in o) && o.fill && o.type!=='image');
   }
   function mapById(arr){
@@ -52,17 +60,26 @@
   function normColor(c){
     if(!c) return null; const ctx=document.createElement('canvas').getContext('2d'); ctx.fillStyle=c; return ctx.fillStyle;
   }
-  function keyFromRGB(rgb){
-    if(!rgb) return null; const m=rgb.match(/\d+/g); if(!m) return null;
-    const [r,g,b]=m.map(n=>parseInt(n,10)); const q=v=>Math.round(v/16)*16;
+  function rgbParts(rgb){
+    const m=rgb && rgb.match(/\d+/g); if(!m) return null; return m.map(n=>parseInt(n,10));
+  }
+  function luma(rgb){ const p=rgbParts(rgb); if(!p) return 0; const [r,g,b]=p; return 0.2126*r+0.7152*g+0.0722*b; }
+  function keyFromRGB(rgb){ // agrupa por color aprox (cuantiza /16)
+    const p=rgbParts(rgb); if(!p) return null; const [r,g,b]=p;
+    const q=v=>Math.round(v/16)*16;
     return `rgb(${q(r)}, ${q(g)}, ${q(b)})`;
+  }
+  function areaOf(o){
+    const w = typeof o.getScaledWidth==='function' ? o.getScaledWidth() : (o.width||0);
+    const h = typeof o.getScaledHeight==='function'? o.getScaledHeight(): (o.height||0);
+    return Math.max(0, w*h);
   }
 
   // --- Buckets por IDs (preferido)
   function buildBucketsById(root){
     const ids = mapById(root._objects?root._objects:[root]);
     if(ids['stripe1'] && ids['stripe2']){
-      bucketA = leavesFill([ids['stripe1']]); // solo fill
+      bucketA = leavesFill([ids['stripe1']]);
       bucketB = leavesFill([ids['stripe2']]);
       dbg.innerHTML = `✅ SVG cargado (modo <b>ids</b>)<br>stripe1 (fill): ${bucketA.length}<br>stripe2 (fill): ${bucketB.length}`;
       mode='ids'; return true;
@@ -70,25 +87,45 @@
     return false;
   }
 
-  // --- Buckets AUTO (agrupa por color de fill, ignora strokes)
+  // --- Buckets AUTO (agrupa por color de fill + filtros de área y luminosidad) ---
   function buildBucketsAuto(root){
-    const all = leavesFill(root._objects?root._objects:[root]); // solo fill
-    const map=new Map();
-    all.forEach(o=>{
-      const key=keyFromRGB(normColor(o.fill));
-      if(!key) return;
-      if(!map.has(key)) map.set(key,[]);
-      map.get(key).push(o);
-    });
-    const top=[...map.entries()].sort((a,b)=>b[1].length-a[1].length).slice(0,2);
-    bucketA = top[0]? top[0][1] : [];
-    bucketB = top[1]? top[1][1] : [];
-    const info=top.map(([k,v],i)=>`#${i+1} ${k} → ${v.length} objs`).join('<br>');
-    dbg.innerHTML = `✅ SVG cargado (modo <b>auto</b>)<br>${info || 'No se detectaron fills'}`;
-    mode='auto';
+    function compute(minArea, minLuma){
+      const all = leavesFill(root._objects?root._objects:[root])
+        .filter(o => areaOf(o) >= minArea)                       // quita motas pequeñas
+        .filter(o => luma(normColor(o.fill)) >= minLuma);        // quita casi-negros (ruido/outline)
+
+      const byKey=new Map(), areaSum=new Map();
+      all.forEach(o=>{
+        const key=keyFromRGB(normColor(o.fill)); if(!key) return;
+        if(!byKey.has(key)) { byKey.set(key,[]); areaSum.set(key,0); }
+        byKey.get(key).push(o);
+        areaSum.set(key, areaSum.get(key)+areaOf(o));
+      });
+
+      // Top 2 por ÁREA total (mejor que por cantidad)
+      const top=[...byKey.keys()]
+            .sort((a,b)=> (areaSum.get(b)||0)-(areaSum.get(a)||0))
+            .slice(0,2);
+      return {
+        A: top[0]? byKey.get(top[0]) : [],
+        B: top[1]? byKey.get(top[1]) : [],
+        info: top.map((k,i)=>`#${i+1} ${k} → ${byKey.get(k)?.length||0} objs, área≈${Math.round(areaSum.get(k)||0)}`).join('<br>')
+      };
+    }
+
+    // 1º intento (fuerte)
+    let res = compute(AUTO_FILTERS.MIN_AREA_1, AUTO_FILTERS.MIN_LUMA_1);
+    // fallback si no logramos 2 grupos
+    if(res.A.length===0 || res.B.length===0){
+      res = compute(AUTO_FILTERS.MIN_AREA_2, AUTO_FILTERS.MIN_LUMA_2);
+      dbg.innerHTML = `✅ SVG cargado (modo <b>auto</b> · fallback)<br>${res.info || 'No se detectaron fills'}`;
+    } else {
+      dbg.innerHTML = `✅ SVG cargado (modo <b>auto</b>)<br>${res.info || 'No se detectaron fills'}`;
+    }
+    bucketA = res.A; bucketB = res.B; mode='auto';
   }
 
-  // --- Texturas sobre color (solo para fill) ---
+  // --- Texturas sobre color (solo fill) ---
   function loadImg(src){ return new Promise(res=>{ const i=new Image(); i.crossOrigin='anonymous'; i.onload=()=>res(i); i.onerror=()=>res(null); i.src=src; }); }
   function tintPattern(img, hex){
     if(!img) return hex;
@@ -100,12 +137,11 @@
     return new fabric.Pattern({ source: off, repeat:'repeat' });
   }
 
-  // --- Pintado (fill solo; NO tocamos stroke = outline se mantiene) ---
+  // --- Pintado (fill solo; NO tocamos stroke) ---
   function paint(){
     const colA=ui.colA.value||'#e6e6e6', colB=ui.colB.value||'#c61a1a';
     const patA=tintPattern(ui.texA.value==='suede'?imgSuede:imgSmooth, colA);
     const patB=tintPattern(ui.texB.value==='suede'?imgSuede:imgSmooth, colB);
-
     const paintSet=(arr,pat)=>{ arr.forEach(o=>{ o.set('fill', pat); o.opacity=1; }); };
     paintSet(bucketA, patA);
     paintSet(bucketB, patB);
@@ -118,7 +154,7 @@
   fabric.loadSVGFromURL(SVG,(objs,opts)=>{
     const root=fabric.util.groupSVGElements(objs,opts);
     fit(root); canvas.add(root);
-    if(!buildBucketsById(root)) buildBucketsAuto(root);
+    if(!buildBucketsById(root)) buildBucketsAuto(root); // IDs o AUTO con filtros
     paint();
   },(item,obj)=>{ obj.selectable=false; });
 
