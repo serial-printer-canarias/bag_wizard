@@ -28,7 +28,7 @@
 
   .wrap{max-width:1200px;margin:0 auto;padding:clamp(10px,3vw,20px)}
 
-  /* Header / Logo */
+  /* Logo inline */
   .brand{display:flex;justify-content:center;align-items:center;margin:6px 0 6px}
   .logo-valonia{height:40px;display:block}
   .logo-valonia *{vector-effect:non-scaling-stroke}
@@ -48,7 +48,6 @@
   }
   .panel{grid-area:controls}
   .stage{grid-area:stage}
-
   @media (max-width:980px){
     .grid{grid-template-columns:1fr; grid-template-areas:"stage" "controls"}
   }
@@ -90,22 +89,24 @@
   /* Canvas: SIEMPRE proporcional (600x800) */
   #cv{
     background:#fff; border-radius:14px; border:1px solid var(--line);
-    display:block; margin:0 auto;             /* centrado */
-    width:auto; height:auto;                   /* nunca fijamos una dimensión */
-    max-width: clamp(260px, 40vw, 420px);      /* límite en desktop */
-    max-height: 72vh;                          /* no ocupa toda la vista */
+    display:block; margin:0 auto;              /* centrado */
+    width:auto; height:auto;                    /* no forzamos dimensiones */
+    max-width: clamp(260px, 40vw, 420px);       /* desktop */
+    /* la altura resultante será 4/3 del ancho (ratio nativo del canvas) */
   }
+  /* Móvil: calculamos un ancho que garantice ver todo sin deformar */
   @media (max-width:980px){
     #cv{
-      max-width:92vw;    /* no se sale por los lados */
-      max-height:56vh;   /* visible en una pantalla */
+      width: min(92vw, calc(56vh * 0.75));     /* 0.75 = 3/4 (ratio 3:4) */
+      height:auto;                              /* mantiene proporción */
+      max-width:92vw;
     }
   }
 </style>
 </head>
 <body>
   <div class="wrap">
-    <!-- Logo inline (sustituye el contenido por tu SVG real si lo tienes) -->
+    <!-- Pega aquí tu SVG real si lo tienes -->
     <div class="brand">
       <svg class="logo-valonia" viewBox="0 0 200 40" xmlns="http://www.w3.org/2000/svg" aria-label="Valonia" fill="none" stroke="currentColor" stroke-width="1.2" style="color:#8A5A44">
         <text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" font-family="Cormorant Garamond, serif" font-size="16" fill="#8A5A44">VALONIA</text>
