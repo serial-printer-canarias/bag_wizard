@@ -17,13 +17,13 @@
   const canvas=new fabric.Canvas('cv',{selection:false});
   canvas.setWidth(W); canvas.setHeight(H);
 
-  // Overlay debug
+  // Debug overlay
   const dbg=document.createElement('div');
   Object.assign(dbg.style,{position:'fixed',top:'8px',right:'8px',background:'rgba(0,0,0,.85)',color:'#fff',
     padding:'8px 10px',font:'12px/1.35 system-ui,Segoe UI,Roboto,Arial',borderRadius:'10px',zIndex:9999,maxWidth:'48ch'});
   dbg.textContent='Cargando…'; document.body.appendChild(dbg);
 
-  let mode=''; // 'ids' | 'auto-color' | 'auto-geom'
+  let mode=''; // 'ids' | 'auto-mix' | 'auto-geom'
   let bucketA=[], bucketB=[];
   let imgSmooth=null, imgSuede=null;
 
@@ -42,6 +42,7 @@
   function getW(o){ return typeof o.getScaledWidth==='function'? o.getScaledWidth(): (o.width||0); }
   function getH(o){ return typeof o.getScaledHeight==='function'? o.getScaledHeight(): (o.height||0); }
   function bboxArea(o){ return Math.max(1, getW(o)*getH(o)); }
+  function centerX(o){ const r=o.getBoundingRect(true,true); return r.left + r.width/2; }
 
   // ---------- color ----------
   function parseColor(str){
@@ -58,7 +59,6 @@
     }
     const m=s.match(/rgba?\((\d+)[,\s]+(\d+)[,\s]+(\d+)(?:[,\s/]+([\d.]+))?\)/);
     if(m) return [parseInt(m[1],10),parseInt(m[2],10),parseInt(m[3],10), m[4]!=null?parseFloat(m[4]):1];
-    // fallback canvas
     const ctx=document.createElement('canvas').getContext('2d'); ctx.fillStyle=s;
     const m2=ctx.fillStyle.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([\d.]+))?\)/);
     return m2?[+m2[1],+m2[2],+m2[3], m2[4]!=null?+m2[4]:1]:null;
@@ -74,7 +74,6 @@
     const a = c[3]==null?1:c[3];
     return a>0.02;
   }
-
   // Outline: sin fill visible + stroke gris/negro oscuro y fino
   function isOutline(o){
     const sw=('strokeWidth' in o)?(o.strokeWidth||0):0;
@@ -82,8 +81,13 @@
     const dark = sRGB && (luma(sRGB)<70) && nearGray(sRGB,22);
     return !hasVisibleFill(o) && dark && sw<=3;
   }
-
-  // RGB → HSV
+  function baseRGB(o){
+    if(hasVisibleFill(o)){
+      const c=parseColor(o.fill); return c? [c[0],c[1],c[2]] : null;
+    }
+    const s=('stroke' in o) ? parseColor(o.stroke) : null;
+    return s? [s[0],s[1],s[2]] : null;
+  }
   function rgb2hsv([r,g,b]){
     r/=255; g/=255; b/=255;
     const max=Math.max(r,g,b), min=Math.min(r,g,b);
@@ -99,54 +103,75 @@
     const v = max;
     return [h,s,v];
   }
-
-  // Color base para agrupar (fill si visible, si no stroke)
-  function baseRGB(o){
-    if(hasVisibleFill(o)){
-      const c=parseColor(o.fill); return c? [c[0],c[1],c[2]] : null;
-    }
-    const s=('stroke' in o) ? parseColor(o.stroke) : null;
-    return s? [s[0],s[1],s[2]] : null;
-  }
   function areaMetric(o){ return hasVisibleFill(o) ? bboxArea(o) : Math.max(1,(o.strokeWidth||1)*5); }
 
-  // HUE clustering (k=2)
-  function clusterByHue(objs){
+  // ---------- clustering ----------
+  // mezcla HUE + posición X (normalizada) con pesos
+  function kmeans2_mix(objs){
+    if(objs.length<=2) return {A:objs, B:[]};
+
+    const weightHue = 1.0;   // aporta color
+    const weightPos = 0.6;   // ayuda a separar franjas (izq/der) y asa
     const items = objs.map(o=>{
-      const rgb = baseRGB(o); if(!rgb) return null;
-      const [h,s,v]=rgb2hsv(rgb);
-      return {o,h,s,v,weight:areaMetric(o)};
-    }).filter(x=>x);
+      const rgb = baseRGB(o);
+      let hx=0, hy=0, hasHue=false;
+      if(rgb){
+        const [h,s,v]=rgb2hsv(rgb);
+        // si es muy oscuro/gris, no usamos hue
+        if(!(s<0.18 || v<0.28)){
+          const rad=h*Math.PI/180;
+          hx = Math.cos(rad)*weightHue;
+          hy = Math.sin(rad)*weightHue;
+          hasHue=true;
+        }
+      }
+      const x = centerX(o);
+      return {o, hx, hy, x, hasHue, w:areaMetric(o)};
+    });
 
-    // filtrar grises/negros: poca saturación o valor muy bajo
-    const filt = items.filter(x=> (x.s>=0.25 && x.v>=0.35));
-    if(filt.length<6) return null; // no hay color suficiente
+    // normalizar X a [0,1]
+    const xs=items.map(i=>i.x);
+    const minX=Math.min(...xs), maxX=Math.max(...xs) || (minX+1);
+    items.forEach(i=>{ i.p = ((i.x-minX)/(maxX-minX))*weightPos; });
 
-    // semilla por extremos de hue
-    let h1=Math.min(...filt.map(x=>x.h)), h2=Math.max(...filt.map(x=>x.h));
-    for(let it=0; it<8; it++){
+    // inicialización: extremos por X
+    let c1={hx:0,hy:0,p:Math.min(...items.map(i=>i.p))};
+    let c2={hx:0,hy:0,p:Math.max(...items.map(i=>i.p))};
+
+    function dist(a,b){
+      const dx=a.hx-b.hx, dy=a.hy-b.hy, dp=a.p-b.p;
+      return dx*dx+dy*dy+dp*dp;
+    }
+    function mean(arr){
+      const W=arr.reduce((s,i)=>s+i.w,0)||1;
+      const sx=arr.reduce((s,i)=>s+i.hx*i.w,0)/W;
+      const sy=arr.reduce((s,i)=>s+i.hy*i.w,0)/W;
+      const sp=arr.reduce((s,i)=>s+i.p*i.w,0)/W;
+      return {hx:sx,hy:sy,p:sp};
+    }
+
+    for(let it=0; it<10; it++){
       const A=[],B=[];
-      filt.forEach(x=>{
-        const d1=Math.min(Math.abs(x.h-h1),360-Math.abs(x.h-h1));
-        const d2=Math.min(Math.abs(x.h-h2),360-Math.abs(x.h-h2));
-        (d1<=d2?A:B).push(x);
+      items.forEach(i=>{
+        (dist(i,c1) <= dist(i,c2) ? A : B).push(i);
       });
-      const mean=(arr)=>arr.length? (arr.reduce((s,x)=>s+x.h*x.weight,0)/arr.reduce((s,x)=>s+x.weight,0)) : 0;
+      if(A.length===0 || B.length===0){
+        // resembrar: forzar median split por X
+        const median = items.map(i=>i.p).sort((a,b)=>a-b)[Math.floor(items.length/2)];
+        const A2=items.filter(i=>i.p<=median), B2=items.filter(i=>i.p>median);
+        return {A:A2.map(i=>i.o), B:B2.map(i=>i.o)};
+      }
       const n1=mean(A), n2=mean(B);
-      if(Math.abs(n1-h1)<0.5 && Math.abs(n2-h2)<0.5) break;
-      h1=n1; h2=n2;
+      if(Math.abs(n1.p-c1.p)<1e-3 && Math.abs(n2.p-c2.p)<1e-3 &&
+         Math.abs(n1.hx-c1.hx)<1e-3 && Math.abs(n2.hx-c2.hx)<1e-3 &&
+         Math.abs(n1.hy-c1.hy)<1e-3 && Math.abs(n2.hy-c2.hy)<1e-3) break;
+      c1=n1; c2=n2;
     }
     const A=[],B=[];
-    filt.forEach(x=>{
-      const d1=Math.min(Math.abs(x.h-h1),360-Math.abs(x.h-h1));
-      const d2=Math.min(Math.abs(x.h-h2),360-Math.abs(x.h-h2));
-      (d1<=d2?A:B).push(x);
-    });
-    return {A:A.map(x=>x.o), B:B.map(x=>x.o), h1:Math.round(h1), h2:Math.round(h2), nA:A.length, nB:B.length};
+    items.forEach(i=>{ (dist(i,c1)<=dist(i,c2)?A:B).push(i); });
+    return {A:A.map(i=>i.o), B:B.map(i=>i.o)};
   }
 
-  // centroid X
-  function centerX(o){ const r=o.getBoundingRect(true,true); return r.left + r.width/2; }
   function kmeans2X(objs){
     if(objs.length<=2) return [objs,[]];
     const xs=objs.map(o=>centerX(o));
@@ -177,35 +202,37 @@
   }
   function applyFill(o,material){ if('fill' in o) o.set('fill',material); else o.fill=material; }
 
+  // buckets
   function buildBuckets(root){
     const all = leafs(root).filter(o=>!isOutline(o));
 
-    // 1) IDs si tienen contenido real
+    // 1) ids si tienen contenido real
     const ids=idsMap(root._objects?root._objects:[root]);
     if(ids['stripe1'] && ids['stripe2']){
       const A=leafs(ids['stripe1']).filter(o=>!isOutline(o));
       const B=leafs(ids['stripe2']).filter(o=>!isOutline(o));
       if(A.length>=5 && B.length>=5){
         bucketA=A; bucketB=B; mode='ids';
-        dbg.innerHTML=`✅ SVG cargado (modo <b>ids</b>)<br>stripe1: ${A.length} objs · stripe2: ${B.length} objs`;
+        dbg.innerHTML=`✅ SVG cargado (modo <b>ids</b>) · stripe1: ${A.length} · stripe2: ${B.length}`;
         return;
       }
     }
 
-    // 2) AUTO por HUE (ignora oscuros/grises)
-    const hueCluster = clusterByHue(all);
-    if(hueCluster){
-      bucketA=hueCluster.A; bucketB=hueCluster.B; mode='auto-color';
-      dbg.innerHTML=`✅ SVG cargado (modo <b>auto-color</b>)<br>Hue A≈${hueCluster.h1}° (${hueCluster.nA} objs) · Hue B≈${hueCluster.h2}° (${hueCluster.nB} objs)`;
+    // 2) auto-mix (color + posición)
+    const {A,B} = kmeans2_mix(all);
+    if(A.length && B.length){
+      bucketA=A; bucketB=B; mode='auto-mix';
+      dbg.innerHTML=`✅ SVG cargado (modo <b>auto-mix</b>) · A: ${A.length} objs · B: ${B.length} objs`;
       return;
     }
 
-    // 3) AUTO geométrico si no se detectaron colores válidos
-    const [A,B]=kmeans2X(all);
-    bucketA=A; bucketB=B; mode='auto-geom';
-    dbg.innerHTML=`✅ SVG cargado (modo <b>auto-geom</b>)<br>A: ${A.length} objs · B: ${B.length} objs`;
+    // 3) auto-geom por X
+    const [AX,BX]=kmeans2X(all);
+    bucketA=AX; bucketB=BX; mode='auto-geom';
+    dbg.innerHTML=`✅ SVG cargado (modo <b>auto-geom</b>) · A: ${AX.length} objs · B: ${BX.length} objs`;
   }
 
+  // pintado
   function paint(){
     const colA=ui.colA.value||'#e6e6e6', colB=ui.colB.value||'#c61a1a';
     const patA=tintPattern(ui.texA.value==='suede'?imgSuede:imgSmooth, colA);
@@ -224,6 +251,7 @@
     paint();
   },(item,obj)=>{ obj.selectable=false; });
 
+  // UI
   ['change','input'].forEach(ev=>{
     ui.colA.addEventListener(ev, paint);
     ui.colB.addEventListener(ev, paint);
