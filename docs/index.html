@@ -48,7 +48,6 @@
   }
   .panel{grid-area:controls}
   .stage{grid-area:stage}
-
   @media (max-width:980px){
     .grid{grid-template-columns:1fr; grid-template-areas:"stage" "controls"}
   }
@@ -87,26 +86,24 @@
   #dl{ background:var(--pink); border-color:transparent; color:var(--terracotta) }
   button:hover{transform:translateY(-1px)}
 
-  /* ====== PREVIEW SIN DEFORMACIÓN ======
-     Usamos un marco con aspect-ratio 3/4 y el canvas lo rellena. */
+  /* ====== PREVIEW PROPORCIONAL ======
+     Marco con ratio 3/4; el canvas rellena el marco. */
   .cv-frame{
-    /* Desktop: ancho compacto; alto se calcula por aspect-ratio */
-    width: clamp(260px, 40vw, 420px);
-    aspect-ratio: 3 / 4;                 /* 600x800 */
+    width: clamp(260px, 40vw, 420px);  /* desktop */
+    aspect-ratio: 3 / 4;               /* 600x800 */
     border:1px solid var(--line);
     border-radius:14px;
     background:#fff;
     overflow:hidden;
     margin:0 auto;
   }
-  /* En móvil, quepa en una vista sin deformar */
   @media (max-width:980px){
     .cv-frame{
-      width: min(86vw, calc(48vh * 0.75));   /* 0.75 = 3/4 */
+      width: min(86vw, calc(48vh * .75));  /* encaja en móvil y respeta 3:4 */
       aspect-ratio: 3 / 4;
     }
   }
-  /* El canvas ocupa todo el marco, manteniendo proporción nativa */
+  /* El canvas ocupa el marco sin deformarse */
   #cv{
     width:100% !important;
     height:100% !important;
@@ -160,7 +157,7 @@
       </div>
 
       <div class="box stage">
-        <!-- 🔒 Mantén atributos lógicos 600x800, rellenará el marco 3:4 sin deformarse -->
+        <!-- Mantén atributos lógicos 600x800; el marco gobierna la vista -->
         <div class="cv-frame">
           <canvas id="cv" width="600" height="800"></canvas>
         </div>
@@ -168,7 +165,70 @@
     </div>
   </div>
 
+  <!-- Librería y wizard original -->
   <script src="https://cdn.jsdelivr.net/npm/fabric@5.3.0/dist/fabric.min.js"></script>
   <script src="js/customizer.js"></script>
+
+  <!-- 🔧 Parche no invasivo: encajar contenido al marco en load/resize -->
+  <script>
+  (function(){
+    function resolveCanvas(){
+      // Intenta encontrar la instancia de Fabric creada por tu wizard
+      if (window.canvas && window.canvas.getObjects) return window.canvas;
+      if (window.cv && window.cv.getObjects) return window.cv;
+      const el = document.getElementById('cv');
+      if (el && el.__canvas && el.__canvas.getObjects) return el.__canvas; // algunos setups lo guardan aquí
+      // Último recurso: buscar objetos con lowerCanvasEl
+      for (const k in window){
+        try{
+          const v = window[k];
+          if (v && v.lowerCanvasEl && v.getObjects) return v;
+        }catch(e){}
+      }
+      return null;
+    }
+
+    function fitToFrame(pad=8){
+      const c = resolveCanvas();
+      if (!c) return;                 // aún no cargó el wizard
+      c.renderAll();
+
+      const objs = c.getObjects();
+      if (!objs.length){ requestAnimationFrame(()=>fitToFrame(pad)); return; }
+
+      // Bounding rect absoluto de todos los objetos
+      let minX=Infinity, minY=Infinity, maxX=-Infinity, maxY=-Infinity;
+      objs.forEach(o=>{
+        const b=o.getBoundingRect(true,true);
+        minX=Math.min(minX,b.left);
+        minY=Math.min(minY,b.top);
+        maxX=Math.max(maxX,b.left+b.width);
+        maxY=Math.max(maxY,b.top+b.height);
+      });
+      const bw = maxX - minX, bh = maxY - minY;
+      if (bw<=0 || bh<=0) return;
+
+      const cw = c.getWidth()  - pad*2;
+      const ch = c.getHeight() - pad*2;
+      const zoom = Math.min(cw / bw, ch / bh);
+
+      c.setZoom(zoom);
+      const vpt = c.viewportTransform ? c.viewportTransform.slice() : [1,0,0,1,0,0];
+      const cx = c.getWidth()/2, cy = c.getHeight()/2;
+      const ox = minX + bw/2,    oy = minY + bh/2;
+      vpt[4] = cx - ox * zoom;   // tx
+      vpt[5] = cy - oy * zoom;   // ty
+      c.setViewportTransform(vpt);
+      c.requestRenderAll();
+    }
+
+    // Ejecuta al cargar (un pelín después para esperar al SVG) y en resize
+    window.addEventListener('load',  ()=>setTimeout(fitToFrame, 200));
+    window.addEventListener('resize',()=>setTimeout(fitToFrame, 60));
+
+    // Exponer por si quieres llamarlo tras cambiar colores:
+    window.fitPreview = fitToFrame;
+  })();
+  </script>
 </body>
 </html>
