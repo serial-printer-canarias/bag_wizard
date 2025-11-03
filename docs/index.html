@@ -15,7 +15,6 @@
   .stage{display:flex;align-items:center;justify-content:center;padding:10px}
   .row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:6px 0}
   label{display:inline-flex;align-items:center;gap:8px}
-  select,input[type="color"],button{margin-left:6px}
   button{cursor:pointer;padding:8px 10px;border-radius:8px;border:1px solid var(--line);background:#fff}
   #cv{border:1px dashed var(--line);background:#fff;border-radius:10px;width:600px;height:800px}
 </style>
@@ -67,34 +66,32 @@
   <script src="https://cdn.jsdelivr.net/npm/fabric@5.3.0/dist/fabric.min.js"></script>
   <script>
   (function(){
-    // -------- CONFIG --------
+    // --- RUTAS ---
     const SVG = 'assets/svg/bag_base.svg';
     const TX  = {
       smooth: 'assets/textures/leather_smooth.jpg',
       suede:  'assets/textures/leather_suede.jpg',
     };
-    const THRESH_MIN_IDS = 8; // si stripe1/2 traen menos de esto, caemos a auto-mix
 
-    // -------- UI --------
-    const $ = (s,c=document)=>c.querySelector(s);
-    const ui = {
+    // --- UI ---
+    const $=(s,c=document)=>c.querySelector(s);
+    const ui={
       texA:$('#texA'), colA:$('#colA'),
       texB:$('#texB'), colB:$('#colB'),
       stitch:$('#stitchColor'),
       dl:$('#dl'), save:$('#save'), hidden:$('#spbc_config_json')
     };
 
-    // -------- Canvas --------
+    // --- Canvas ---
     const W=600,H=800;
     const canvas=new fabric.Canvas('cv',{selection:false});
     canvas.setWidth(W); canvas.setHeight(H);
 
-    // Debug bubble
+    // debug bubble
     const dbg=document.createElement('div');
     Object.assign(dbg.style,{position:'fixed',top:'8px',right:'8px',background:'rgba(0,0,0,.85)',color:'#fff',
       padding:'8px 10px',font:'12px/1.35 system-ui,Segoe UI,Roboto,Arial',borderRadius:'10px',zIndex:9999,maxWidth:'54ch'});
-    dbg.textContent='Cargando…'; document.body.appendChild(dbg);
-    const say=(t)=>dbg.innerHTML=t;
+    document.body.appendChild(dbg); const say=t=>dbg.innerHTML=t; say('Cargando…');
 
     // helpers
     const fit=(g)=>{ const m=24,maxW=W-2*m,maxH=H-2*m; const w=g.width||g.getScaledWidth(),h=g.height||g.getScaledHeight();
@@ -103,8 +100,6 @@
     const leafs=(root)=>{ const out=[]; walk([root],o=>{ if(o._objects&&o._objects.length) return; if(o.type==='image') return; out.push(o); }); return out; };
     const byId=(root)=>{ const map={}; walk([root], o=>{ if(o.id) map[o.id]=o; }); return map; };
     const bringChildToTop=(parent,child)=>{ if(!parent||!parent._objects) return; const a=parent._objects,i=a.indexOf(child); if(i>=0){a.splice(i,1);a.push(child);parent.dirty=true;} };
-    const hasFill=o=>('fill' in o && o.fill && o.fill!=='none');
-    const hasStroke=o=>('stroke' in o && o.stroke && o.stroke!=='none');
 
     // texturas
     function loadImg(src){ return new Promise(res=>{ if(!src){res(null);return;} const i=new Image(); i.crossOrigin='anonymous'; i.onload=()=>res(i); i.onerror=()=>res(null); i.src=src; }); }
@@ -122,106 +117,85 @@
     let imgSmooth=null, imgSuede=null;
     Promise.all([loadImg(TX.smooth), loadImg(TX.suede)]).then(([a,b])=>{ imgSmooth=a; imgSuede=b; });
 
-    // buckets y sets
-    let bucketA=[], bucketB=[], outlineSet=new Set(), stitchSet=new Set(), mode='ids';
+    // buckets
+    let bucketA=[], bucketB=[], outlineSet=new Set(), stitchSet=new Set();
     let rootGroup=null;
 
-    // SOLO detectamos contorno/costura por ID (nada de heurísticas agresivas)
-    function detectOutlineAndStitchById(root){
-      outlineSet=new Set(); stitchSet=new Set();
-      const ids=byId(root);
-
-      const gOutline = ids['body_x5F_clip'] || ids['outline'] || ids['outlines'] || null;
-      if(gOutline){
-        const leaves=[]; walk([gOutline], o=>{ if(o._objects&&o._objects.length) return; leaves.push(o); });
-        leaves.forEach(o=>{
-          outlineSet.add(o);
-          // estilo negro por defecto
-          if(hasStroke(o) && !hasFill(o)){
-            o.set({fill:'none', stroke:'#111', strokeWidth:1.4, strokeLineCap:'round', strokeLineJoin:'round', strokeUniform:true, opacity:1});
-          }else{
-            o.set({fill:'#111', stroke:null, strokeWidth:0, opacity:1});
-          }
-          if(o.group) bringChildToTop(o.group,o);
-          o.dirty=true;
-        });
-        const parent=gOutline.group||root; bringChildToTop(parent,gOutline);
-      }
-
-      const gStitch = ids['stitch'] || ids['seam'] || null;
-      if(gStitch){
-        const leaves=[]; walk([gStitch], o=>{ if(o._objects&&o._objects.length) return; leaves.push(o); });
-        leaves.forEach(o=>{ stitchSet.add(o); });
-        const parent=gStitch.group||root; bringChildToTop(parent,gStitch);
-      }
-    }
-
-    function buildBuckets(root){
-      const ids = byId(root);
-      const allLeaves = leafs(root).filter(o=>!outlineSet.has(o) && !stitchSet.has(o));
-
-      const hasIds = ids['stripe1'] && ids['stripe2'];
-      if(hasIds){
-        const A=leafs(ids['stripe1']).filter(o=>!outlineSet.has(o)&&!stitchSet.has(o));
-        const B=leafs(ids['stripe2']).filter(o=>!outlineSet.has(o)&&!stitchSet.has(o));
-        if(A.length>=THRESH_MIN_IDS && B.length>=THRESH_MIN_IDS){
-          bucketA=A; bucketB=B; mode='ids'; return;
+    function styleOutlineLeaves(leaves, root){
+      leaves.forEach(o=>{
+        // contorno SIEMPRE negro y arriba
+        if(o.stroke && (!o.fill || o.fill==='none')){
+          o.set({fill:'none', stroke:'#111', strokeWidth:1.4, strokeLineCap:'round', strokeLineJoin:'round', strokeUniform:true, opacity:1});
+        }else{
+          o.set({fill:'#111', stroke:null, strokeWidth:0, opacity:1});
         }
-      }
-      // Fallback: auto-mix por posición X (simple, robusto)
-      const cx=(o)=>{ const r=o.getBoundingRect(true,true); return r.left+r.width/2; };
-      const xs=allLeaves.map(cx); if(!xs.length){ bucketA=[]; bucketB=[]; mode='vacio'; return; }
-      const min=Math.min(...xs), max=Math.max(...xs), mid=(min+max)/2;
-      bucketA=allLeaves.filter(o=>cx(o)<=mid);
-      bucketB=allLeaves.filter(o=>cx(o)>mid);
-      mode = hasIds ? 'fallback-geom' : 'auto-geom';
-    }
-
-    function restyleOutlineAndStitch(){
-      // outline ya negro; solo re-aseguramos
-      outlineSet.forEach(o=>{
-        if(hasStroke(o) && !hasFill(o)){ o.set({fill:'none', stroke:'#111'}); }
-        else { o.set({fill:'#111', stroke:null, strokeWidth:0}); }
         if(o.group) bringChildToTop(o.group,o);
         o.dirty=true;
+        outlineSet.add(o);
       });
-      // costura al color elegido
-      const color = ui.stitch.value || '#2a2a2a';
+      const parent = (leaves[0] && leaves[0].group) ? leaves[0].group.group || root : root;
+      if(parent) parent.dirty=true;
+    }
+
+    function colorStitchLeaves(color){
       stitchSet.forEach(o=>{
-        if(hasStroke(o)){ o.set({stroke:color, strokeUniform:true, opacity:1}); }
-        else { o.set({fill:color, opacity:1}); }
+        if(o.stroke){ o.set({stroke:color, strokeUniform:true, opacity:1}); }
+        else{ o.set({fill:color, opacity:1}); }
         if(o.group) bringChildToTop(o.group,o);
         o.dirty=true;
       });
     }
 
     function paint(){
-      const colA = ui.colA.value||'#e6e6e6';
-      const colB = ui.colB.value||'#c61a1a';
-      const matA = tintPattern(ui.texA.value==='suede'?imgSuede:imgSmooth, colA);
-      const matB = tintPattern(ui.texB.value==='suede'?imgSuede:imgSmooth, colB);
+      const colA=ui.colA.value||'#e6e6e6';
+      const colB=ui.colB.value||'#c61a1a';
+      const matA=tintPattern(ui.texA.value==='suede'?imgSuede:imgSmooth, colA);
+      const matB=tintPattern(ui.texB.value==='suede'?imgSuede:imgSmooth, colB);
 
       bucketA.forEach(o=>{ applyFill(o,matA); o.dirty=true; });
       bucketB.forEach(o=>{ applyFill(o,matB); o.dirty=true; });
-      restyleOutlineAndStitch();
+
+      // reafirmar estilos outline y costura
+      styleOutlineLeaves([...outlineSet], rootGroup); // no pasa nada si ya están
+      colorStitchLeaves(ui.stitch.value || '#2a2a2a');
+
       canvas.requestRenderAll();
     }
 
-    // Carga robusta del SVG
+    // Carga estricta por IDs (sin mezclas)
     fabric.util.request(SVG, {
       method: 'GET',
       onComplete: function(xhr){
-        if(xhr.status!==200){ say('❌ No se pudo cargar <b>'+SVG+'</b> (HTTP '+xhr.status+'). Revisa ruta/nombre.'); return; }
+        if(xhr.status!==200){ say('❌ No se pudo cargar <b>'+SVG+'</b> (HTTP '+xhr.status+').'); return; }
         fabric.loadSVGFromString(xhr.responseText, (objs, opts)=>{
-          if(!objs || !objs.length){ say('❌ SVG sin objetos. Abre '+SVG+' y verifica contenido.'); return; }
           rootGroup = fabric.util.groupSVGElements(objs, opts);
           fit(rootGroup); canvas.add(rootGroup);
 
-          detectOutlineAndStitchById(rootGroup); // SOLO por id
-          buildBuckets(rootGroup);
-          paint();
+          const ids = byId(rootGroup);
+          const gA = ids['stripe1'];
+          const gB = ids['stripe2'];
+          const gOutline = ids['body_x5F_clip'] || ids['outline'] || null;
+          const gStitch  = ids['stitch'] || null;
 
-          say(`✅ SVG cargado (${mode}) · A:${bucketA.length} · B:${bucketB.length} · outline:${outlineSet.size} · stitch:${stitchSet.size}`);
+          if(!gA || !gB){
+            say('❌ Faltan <b>id="stripe1"</b> y/o <b>id="stripe2"</b> en el SVG. No se pintará.');
+            return;
+          }
+
+          // buckets A/B únicamente por IDs
+          bucketA = leafs(gA);
+          bucketB = leafs(gB);
+
+          // outline fijo (negro, no modificable)
+          outlineSet.clear();
+          if(gOutline) styleOutlineLeaves(leafs(gOutline), rootGroup);
+
+          // costura opcional
+          stitchSet.clear();
+          if(gStitch){ leafs(gStitch).forEach(o=>stitchSet.add(o)); }
+
+          paint();
+          say(`✅ SVG cargado (modo ids) · A:${bucketA.length} · B:${bucketB.length} · outline:${outlineSet.size} · stitch:${stitchSet.size}`);
         }, (item, obj)=>{ obj.selectable=false; });
       }
     });
@@ -241,11 +215,11 @@
     });
     ui.save.addEventListener('click', ()=>{
       ui.hidden.value = JSON.stringify({
-        model:'bucket-01', mode,
+        model:'bucket-ids',
         A:{ texture: ui.texA.value, color: ui.colA.value },
         B:{ texture: ui.texB.value, color: ui.colB.value },
         C:{ stitch: ui.stitch.value },
-        version:'1.1.1'
+        version:'1.2.0'
       });
       alert(ui.hidden.value);
     });
