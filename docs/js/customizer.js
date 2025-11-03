@@ -15,69 +15,11 @@
     dl:$('#dl'), save:$('#save'), hidden:$('#spbc_config_json')
   };
 
-  // ======== Canvas (ajuste de VISTA, lo único nuevo) =========
-  const W=600,H=800;                 // ratio maestro 3:4 del arte
-  const cvEl=document.getElementById('cv');
+  const W=600,H=800;
   const canvas=new fabric.Canvas('cv',{selection:false});
   canvas.setWidth(W); canvas.setHeight(H);
 
-  // Dimensionar el canvas al tamaño visible del contenedor, manteniendo 3:4
-  const MAX_VH=0.62;        // el marco no supera el 62% del alto del viewport
-  const FIRST_SHRINK=0.84;  // la primera vista un poco más pequeña
-  const FRAME_MARGIN=0.06;  // margen interno 6%
-
-  let rootRef=null;
-  let firstFit=true;
-
-  function resolveCanvasSize(){
-    const box = cvEl.parentElement || document.body;
-    const maxW = Math.max(1, box.clientWidth || W);
-    const maxH = Math.floor(window.innerHeight * MAX_VH);
-    // intentamos por ancho respetando 3:4
-    let cw = maxW;
-    let ch = Math.round(cw * (H/W));
-    if (ch > maxH){ ch = maxH; cw = Math.round(ch * (W/H)); }
-    return [cw, ch];
-  }
-  function syncCanvasSize(){
-    const [cw,ch]=resolveCanvasSize();
-    canvas.setDimensions({width:cw,height:ch},{backstoreOnly:false});
-  }
-  function fit(g){
-    if(!g) return;
-    // baseline del SVG (sin acumulaciones)
-    if(!g.__w0) g.__w0 = g.width  || g.getScaledWidth()  || 1;
-    if(!g.__h0) g.__h0 = g.height || g.getScaledHeight() || 1;
-
-    syncCanvasSize();
-
-    const CW=canvas.getWidth(), CH=canvas.getHeight();
-    const pad=Math.round(Math.min(CW,CH)*FRAME_MARGIN);
-    const maxW=Math.max(1, CW-2*pad);
-    const maxH=Math.max(1, CH-2*pad);
-
-    let s=Math.min(maxW/g.__w0, maxH/g.__h0);
-    if(firstFit) s*=FIRST_SHRINK;
-
-    g.set({
-      scaleX:s, scaleY:s,
-      left:(CW - g.__w0*s)/2,
-      top:(CH - g.__h0*s)/2,
-      selectable:false, evented:false
-    });
-    g.setCoords();
-    canvas.requestRenderAll();
-    firstFit=false;
-  }
-
-  // Reencajar al cambiar tamaño visible
-  if('ResizeObserver' in window){
-    const ro=new ResizeObserver(()=>fit(rootRef));
-    ro.observe(cvEl.parentElement || cvEl);
-  }
-  window.addEventListener('resize',()=>fit(rootRef));
-
-  // =================== TU LÓGICA ORIGINAL (sin tocar) ===================
+  // Debug
   const dbg=document.createElement('div');
   Object.assign(dbg.style,{position:'fixed',top:'8px',right:'8px',background:'rgba(0,0,0,.85)',color:'#fff',
     padding:'8px 10px',font:'12px/1.35 system-ui,Segoe UI,Roboto,Arial',borderRadius:'10px',zIndex:9999,maxWidth:'48ch'});
@@ -92,6 +34,13 @@
   let imgSmooth=null, imgSuede=null;
 
   // ---------- helpers ----------
+  function fit(g){
+    const m=24,maxW=W-2*m,maxH=H-2*m;
+    const w=g.width||g.getScaledWidth(),h=g.height||g.getScaledHeight();
+    const s=Math.min(maxW/w,maxH/h);
+    g.scale(s);
+    g.set({left:(W-w*s)/2,top:(H-h*s)/2,selectable:false,evented:false});
+  }
   function walk(arr,fn){ (function rec(a){ a.forEach(o=>{ fn(o); if(o._objects&&o._objects.length) rec(o._objects); }); })(arr); }
   function leafs(root){ const out=[]; walk([root], o=>{ if(o._objects&&o._objects.length) return; if(o.type==='image') return; out.push(o); }); return out; }
   function idsMap(arr){ const map={}; walk(arr,o=>{ if(o.id) map[o.id]=o; }); return map; }
@@ -366,13 +315,13 @@
 
   fabric.loadSVGFromURL(SVG,(objs,opts)=>{
     const root=fabric.util.groupSVGElements(objs,opts);
-    rootRef=root;
-
-    // === Orden original: 1) encajar, 2) añadir, 3) detectar/pintar ===
     fit(root); canvas.add(root);
 
+    // --- nuevo: detectar y configurar costura (C) ---
     collectStitch(root);
+    // existente: contornos
     styleAndCollectOutlines(root);
+    // buckets A/B (excluyen outline y costura)
     buildBuckets(root);
     paint();
   },(item,obj)=>{ obj.selectable=false; });
