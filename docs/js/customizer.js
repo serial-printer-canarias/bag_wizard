@@ -17,7 +17,7 @@
   const canvas=new fabric.Canvas('cv',{selection:false});
   canvas.setWidth(W); canvas.setHeight(H);
 
-  // Debug overlay
+  // Debug
   const dbg=document.createElement('div');
   Object.assign(dbg.style,{position:'fixed',top:'8px',right:'8px',background:'rgba(0,0,0,.85)',color:'#fff',
     padding:'8px 10px',font:'12px/1.35 system-ui,Segoe UI,Roboto,Arial',borderRadius:'10px',zIndex:9999,maxWidth:'48ch'});
@@ -25,11 +25,10 @@
 
   let mode=''; // 'ids' | 'auto-mix' | 'auto-geom'
   let bucketA=[], bucketB=[];
-  let outlineSet=new Set();       // todos los objetos del contorno
-  let outlineGroup=null;          // referencia al grupo outline (si existe)
+  let outlineSet=new Set(); // hojas que son contorno/detalle
   let imgSmooth=null, imgSuede=null;
 
-  // ---------------- helpers ----------------
+  // ---------- helpers ----------
   function fit(g){
     const m=24,maxW=W-2*m,maxH=H-2*m;
     const w=g.width||g.getScaledWidth(),h=g.height||g.getScaledHeight();
@@ -42,20 +41,18 @@
   function idsMap(arr){ const map={}; walk(arr,o=>{ if(o.id) map[o.id]=o; }); return map; }
   function bringChildToTop(parent, child){
     if(!parent || !parent._objects) return;
-    const arr = parent._objects;
-    const idx = arr.indexOf(child);
+    const arr=parent._objects, idx=arr.indexOf(child);
     if(idx>=0){ arr.splice(idx,1); arr.push(child); parent.dirty=true; }
   }
 
-  function getW(o){ return typeof o.getScaledWidth==='function'? o.getScaledWidth(): (o.width||0); }
-  function getH(o){ return typeof o.getScaledHeight==='function'? o.getScaledHeight(): (o.height||0); }
-  function bboxArea(o){ return Math.max(1, getW(o)*getH(o)); }
-  function centerX(o){ const r=o.getBoundingRect(true,true); return r.left + r.width/2; }
+  const getW=o=>typeof o.getScaledWidth==='function'?o.getScaledWidth(): (o.width||0);
+  const getH=o=>typeof o.getScaledHeight==='function'?o.getScaledHeight(): (o.height||0);
+  const bboxArea=o=>Math.max(1,getW(o)*getH(o));
+  const centerX=o=>{ const r=o.getBoundingRect(true,true); return r.left + r.width/2; };
 
-  // --------------- color utils ---------------
+  // ---------- color ----------
   function parseColor(str){
-    if(!str) return null;
-    if(typeof str!=='string') return null;
+    if(!str || typeof str!=='string') return null;
     const s=str.trim().toLowerCase();
     if(s==='none' || s.startsWith('url(')) return null;
     if(s.startsWith('#')){
@@ -77,81 +74,77 @@
   function hasVisibleFill(o){
     if(!('fill' in o) || !o.fill) return false;
     if(o.fill==='none') return false;
-    const c=parseColor(o.fill);
-    if(!c) return false;
-    const a = c[3]==null?1:c[3];
+    const c=parseColor(o.fill); if(!c) return false;
+    const a=c[3]==null?1:c[3];
     return a>0.02;
   }
-  // Outline heurístico (por si hiciera falta)
-  function isOutlineHeuristic(o){
+  function hasStroke(o){ return ('stroke' in o) && o.stroke && o.stroke!=='none'; }
+
+  // Heurística de contorno:
+  // 1) objetos SIN fill + stroke oscuro y fino
+  function isOutlineStroke(o){
+    if(hasVisibleFill(o)) return false;
+    if(!hasStroke(o)) return false;
+    const sRGB=parseColor(o.stroke);
     const sw=('strokeWidth' in o)?(o.strokeWidth||0):0;
-    const sRGB=('stroke' in o)?parseColor(o.stroke):null;
-    const dark = sRGB && (luma(sRGB)<80) && nearGray(sRGB,30);
-    return !hasVisibleFill(o) && dark && sw<=4;
+    return sRGB && nearGray(sRGB,30) && luma(sRGB)<85 && sw<=4;
+  }
+  // 2) "tinta" negra (con fill) pero área pequeña
+  function isInkDetail(o, areaRoot){
+    if(!hasVisibleFill(o)) return false;
+    const rgb=parseColor(o.fill);
+    if(!rgb) return false;
+    if(!(nearGray(rgb,28) && luma(rgb)<90)) return false; // oscuro
+    const a=bboxArea(o);
+    // detalle: menos del 2% del área del bolso escalado
+    return a <= areaRoot*0.02;
   }
 
-  // ---------------- clustering ----------------
+  // ---------- clustering ----------
   function rgb2hsv([r,g,b]){
     r/=255; g/=255; b/=255;
     const max=Math.max(r,g,b), min=Math.min(r,g,b);
-    const d=max-min;
-    let h=0;
-    if(d!==0){
-      if(max===r) h=((g-b)/d)%6;
-      else if(max===g) h=(b-r)/d+2;
-      else h=(r-g)/d+4;
-      h*=60; if(h<0) h+=360;
-    }
-    const s = max===0?0:d/max;
-    const v = max;
+    const d=max-min; let h=0;
+    if(d!==0){ if(max===r) h=((g-b)/d)%6; else if(max===g) h=(b-r)/d+2; else h=(r-g)/d+4; h*=60; if(h<0) h+=360; }
+    const s=max===0?0:d/max, v=max;
     return [h,s,v];
   }
   function baseRGB(o){
-    if(hasVisibleFill(o)){
-      const c=parseColor(o.fill); return c? [c[0],c[1],c[2]] : null;
-    }
-    const s=('stroke' in o) ? parseColor(o.stroke) : null;
-    return s? [s[0],s[1],s[2]] : null;
+    if(hasVisibleFill(o)){ const c=parseColor(o.fill); return c?[c[0],c[1],c[2]]:null; }
+    if(hasStroke(o)){ const s=parseColor(o.stroke); return s?[s[0],s[1],s[2]]:null; }
+    return null;
   }
   function areaMetric(o){ return hasVisibleFill(o) ? bboxArea(o) : Math.max(1,(o.strokeWidth||1)*5); }
 
-  // mezcla HUE + posición X
   function kmeans2_mix(objs){
-    if(objs.length<=2) return {A:objs, B:[]};
-    const weightHue = 1.0, weightPos = 0.6;
+    if(objs.length<=2) return {A:objs,B:[]};
+    const weightHue=1.0, weightPos=0.6;
 
     const items = objs.map(o=>{
-      const rgb = baseRGB(o);
+      const rgb=baseRGB(o);
       let hx=0, hy=0;
       if(rgb){
         const [h,s,v]=rgb2hsv(rgb);
-        if(!(s<0.18 || v<0.28)){ // ignora grises/oscuros
-          const rad=h*Math.PI/180;
-          hx = Math.cos(rad)*weightHue;
-          hy = Math.sin(rad)*weightHue;
-        }
+        if(!(s<0.18 || v<0.28)){ const rad=h*Math.PI/180; hx=Math.cos(rad)*weightHue; hy=Math.sin(rad)*weightHue; }
       }
-      const x = centerX(o);
-      return {o, hx, hy, x, w:areaMetric(o)};
+      const x=centerX(o);
+      return {o,hx,hy,x,w:areaMetric(o)};
     });
 
     const xs=items.map(i=>i.x);
     const minX=Math.min(...xs), maxX=Math.max(...xs) || (minX+1);
-    items.forEach(i=>{ i.p = ((i.x-minX)/(maxX-minX))*weightPos; });
+    items.forEach(i=>{ i.p=((i.x-minX)/(maxX-minX))*weightPos; });
 
     let c1={hx:0,hy:0,p:Math.min(...items.map(i=>i.p))};
     let c2={hx:0,hy:0,p:Math.max(...items.map(i=>i.p))};
-
     const dist=(a,b)=>{ const dx=a.hx-b.hx, dy=a.hy-b.hy, dp=a.p-b.p; return dx*dx+dy*dy+dp*dp; };
-    const mean=(arr)=>{ const W=arr.reduce((s,i)=>s+i.w,0)||1;
-      return {hx:arr.reduce((s,i)=>s+i.hx*i.w,0)/W, hy:arr.reduce((s,i)=>s+i.hy*i.w,0)/W, p:arr.reduce((s,i)=>s+i.p*i.w,0)/W};
-    };
+    const mean=arr=>{ const W=arr.reduce((s,i)=>s+i.w,0)||1;
+      return {hx:arr.reduce((s,i)=>s+i.hx*i.w,0)/W, hy:arr.reduce((s,i)=>s+i.hy*i.w,0)/W, p:arr.reduce((s,i)=>s+i.p*i.w,0)/W}; };
 
     for(let it=0; it<10; it++){
-      const A=[],B=[];
-      items.forEach(i=>{ (dist(i,c1) <= dist(i,c2) ? A : B).push(i); });
+      const A=[],B=[]; items.forEach(i=>{ (dist(i,c1)<=dist(i,c2)?A:B).push(i); });
       if(!A.length || !B.length){
-        const median = items.map(i=>i.p).sort((a,b)=>a-b)[Math.floor(items.length/2)];
+        const median=items.map(i=>i.p).sort((a,b)=>a-b)[Math.floor(items.length/2)];
         const A2=items.filter(i=>i.p<=median), B2=items.filter(i=>i.p>median);
         return {A:A2.map(i=>i.o), B:B2.map(i=>i.o)};
       }
@@ -161,8 +154,7 @@
          Math.abs(n1.hy-c1.hy)<1e-3 && Math.abs(n2.hy-c2.hy)<1e-3) break;
       c1=n1; c2=n2;
     }
-    const A=[],B=[];
-    items.forEach(i=>{ (dist(i,c1)<=dist(i,c2)?A:B).push(i); });
+    const A=[],B=[]; items.forEach(i=>{ (dist(i,c1)<=dist(i,c2)?A:B).push(i); });
     return {A:A.map(i=>i.o), B:B.map(i=>i.o)};
   }
   function kmeans2X(objs){
@@ -170,19 +162,16 @@
     const xs=objs.map(o=>centerX(o));
     let c1=Math.min(...xs), c2=Math.max(...xs);
     for(let i=0;i<8;i++){
-      const A=[],B=[];
-      objs.forEach((o,idx)=>{ (Math.abs(xs[idx]-c1)<=Math.abs(xs[idx]-c2)?A:B).push(o); });
+      const A=[],B=[]; objs.forEach((o,idx)=>{ (Math.abs(xs[idx]-c1)<=Math.abs(xs[idx]-c2)?A:B).push(o); });
       const mean=arr=>arr.length?arr.reduce((s,o)=>s+centerX(o),0)/arr.length:0;
       const n1=mean(A), n2=mean(B);
-      if(Math.abs(n1-c1)<0.5 && Math.abs(n2-c2)<0.5) break;
-      c1=n1; c2=n2;
+      if(Math.abs(n1-c1)<0.5 && Math.abs(n2-c2)<0.5) break; c1=n1; c2=n2;
     }
-    const A=[],B=[];
-    objs.forEach(o=>{ (Math.abs(centerX(o)-c1)<=Math.abs(centerX(o)-c2)?A:B).push(o); });
+    const A=[],B=[]; objs.forEach(o=>{ (Math.abs(centerX(o)-c1)<=Math.abs(centerX(o)-c2)?A:B).push(o); });
     return [A,B];
   }
 
-  // --------------- texturas ---------------
+  // texturas
   function loadImg(src){ return new Promise(res=>{ if(!src){res(null);return;} const i=new Image(); i.crossOrigin='anonymous'; i.onload=()=>res(i); i.onerror=()=>res(null); i.src=src; }); }
   function tintPattern(img,hex){
     if(!img) return hex;
@@ -195,49 +184,40 @@
   }
   const applyFill=(o,mat)=>{ if('fill' in o) o.set('fill',mat); else o.fill=mat; };
 
-  // --------- OUTLINE: forzar estilo + subir grupo ----------
-  function collectLeafs(root){ const all=[]; walk([root],o=>{ if(o._objects&&o._objects.length) return; all.push(o); }); return all; }
-  function styleOutlineGroup(root, ids){
-    outlineSet=new Set(); outlineGroup=null;
+  // --------- OUTLINE: detectar y fijar estilo ----------
+  function styleAndCollectOutlines(root){
+    outlineSet=new Set();
+    const areaRoot = (root.getScaledWidth?.()||getW(root)) * (root.getScaledHeight?.()||getH(root)) || (W*H);
 
-    // localizar grupo por id conocido
-    const g = ids['body_x5F_clip'] || ids['outline'] || ids['outlines'] || null;
-    if(g){
-      outlineGroup=g;
-      const leaves = collectLeafs(g);
+    const ids=idsMap(root._objects?root._objects:[root]);
+    const gOutline = ids['body_x5F_clip'] || ids['outline'] || ids['outlines'] || null;
+    if(gOutline){
+      // fuerza estilo a todas sus hojas
+      const leaves=[]; walk([gOutline], o=>{ if(o._objects&&o._objects.length) return; leaves.push(o); });
       leaves.forEach(o=>{
         outlineSet.add(o);
-        o.set({
-          fill:'none',
-          stroke:'#111',
-          strokeWidth:1.4,
-          strokeLineCap:'round',
-          strokeLineJoin:'round',
-          strokeUniform:true,
-          opacity:1
-        });
+        if(hasStroke(o) || !hasVisibleFill(o)){
+          o.set({fill:'none', stroke:'#111', strokeWidth:1.4, strokeLineCap:'round', strokeLineJoin:'round', strokeUniform:true, opacity:1});
+        }else{
+          o.set({fill:'#111', stroke:null, strokeWidth:0, opacity:1});
+        }
+        if(o.group) bringChildToTop(o.group,o);
       });
-      // subir grupo dentro del root
-      const parent = g.group || root;
-      bringChildToTop(parent, g);
+      // sube el grupo entero dentro de su padre
+      const parent = gOutline.group || root; bringChildToTop(parent, gOutline);
     }
 
-    // fallback: además, cazar outlines por heurística y tratarlos igual
+    // heurística adicional sobre todo el árbol
     leafs(root).forEach(o=>{
       if(outlineSet.has(o)) return;
-      if(isOutlineHeuristic(o)){
+      if(isOutlineStroke(o) || isInkDetail(o, areaRoot)){
         outlineSet.add(o);
-        o.set({
-          fill:'none',
-          stroke:'#111',
-          strokeWidth:1.4,
-          strokeLineCap:'round',
-          strokeLineJoin:'round',
-          strokeUniform:true,
-          opacity:1
-        });
-        // subir su grupo inmediato
-        if(o.group) bringChildToTop(o.group, o);
+        if(isOutlineStroke(o)){
+          o.set({fill:'none', stroke:'#111', strokeWidth:1.4, strokeLineCap:'round', strokeLineJoin:'round', strokeUniform:true, opacity:1});
+        }else{
+          o.set({fill:'#111', stroke:null, strokeWidth:0, opacity:1});
+        }
+        if(o.group) bringChildToTop(o.group,o);
       }
     });
   }
@@ -245,9 +225,9 @@
   // --------- buckets pintables ----------
   function buildBuckets(root){
     const allLeaves = leafs(root);
-    const paintables = allLeaves.filter(o=>!outlineSet.has(o)); // nunca pintar outline
+    const paintables = allLeaves.filter(o=>!outlineSet.has(o)); // NO pintar outline/detalles
 
-    // 1) ids -> stripe1 / stripe2
+    // 1) ids stripe1/stripe2
     const ids=idsMap(root._objects?root._objects:[root]);
     if(ids['stripe1'] && ids['stripe2']){
       const A=leafs(ids['stripe1']).filter(o=>!outlineSet.has(o));
@@ -259,21 +239,21 @@
       }
     }
 
-    // 2) auto-mix (color + posición)
-    const mix = kmeans2_mix(paintables);
+    // 2) color+posición
+    const mix=kmeans2_mix(paintables);
     if(mix.A.length && mix.B.length){
       bucketA=mix.A; bucketB=mix.B; mode='auto-mix';
       dbg.innerHTML=`✅ SVG cargado (modo <b>auto-mix</b>) · A: ${bucketA.length} · B: ${bucketB.length} · outline: ${outlineSet.size}`;
       return;
     }
 
-    // 3) auto-geom
+    // 3) geom por X
     const [AX,BX]=kmeans2X(paintables);
     bucketA=AX; bucketB=BX; mode='auto-geom';
     dbg.innerHTML=`✅ SVG cargado (modo <b>auto-geom</b>) · A: ${AX.length} · B: ${BX.length} · outline: ${outlineSet.size}`;
   }
 
-  // --------------- pintado ---------------
+  // --------- pintado ----------
   function paint(){
     const colA=ui.colA.value||'#e6e6e6', colB=ui.colB.value||'#c61a1a';
     const patA=tintPattern(ui.texA.value==='suede'?imgSuede:imgSmooth, colA);
@@ -282,10 +262,14 @@
     bucketA.forEach(o=>{ applyFill(o, patA); o.dirty=true; });
     bucketB.forEach(o=>{ applyFill(o, patB); o.dirty=true; });
 
-    // asegurar outline arriba y negro
+    // reafirmar contorno encima y negro
     outlineSet.forEach(o=>{
-      o.set({fill:'none', stroke:'#111'});
-      if(o.group) bringChildToTop(o.group, o);
+      if(hasStroke(o) || !hasVisibleFill(o)){
+        o.set({fill:'none', stroke:'#111'});
+      }else{
+        o.set({fill:'#111', stroke:null, strokeWidth:0});
+      }
+      if(o.group) bringChildToTop(o.group,o);
       o.dirty=true;
     });
 
@@ -298,11 +282,9 @@
     const root=fabric.util.groupSVGElements(objs,opts);
     fit(root); canvas.add(root);
 
-    // ids para localizar outline y después buckets
-    const ids=idsMap(root._objects?root._objects:[root]);
-    styleOutlineGroup(root, ids);
-    buildBuckets(root);
-    paint();
+    styleAndCollectOutlines(root);   // ➊ marca y sube contornos
+    buildBuckets(root);              // ➋ arma A/B sin contornos
+    paint();                         // ➌ pinta
   },(item,obj)=>{ obj.selectable=false; });
 
   // UI
