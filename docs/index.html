@@ -1,32 +1,30 @@
 <!doctype html>
 <html lang="es">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Bag Wizard (2 colores / 2 texturas + costura)</title>
-  <style>
-    :root { --bg:#f7f7f9; --panel:#fff; --line:#e6e6e9; }
-    body{margin:0;background:var(--bg);font:15px/1.4 system-ui,Segoe UI,Roboto,Arial,sans-serif;color:#222;}
-    .wrap{max-width:1100px;margin:24px auto;padding:0 16px;}
-    h1{font-size:20px;margin:0 0 14px;}
-    .box{background:var(--panel);border:1px solid var(--line);border-radius:12px;}
-    .grid{display:grid;grid-template-columns:340px 1fr;gap:16px;}
-    .panel{padding:14px;}
-    .stage{display:flex;align-items:center;justify-content:center;padding:10px;}
-    .stage .box{width:100%;min-height:720px;display:flex;align-items:center;justify-content:center;}
-    label{display:inline-flex;align-items:center;gap:8px;margin:6px 0;}
-    select,input[type="color"],button{margin-left:6px}
-    .row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:6px 0;}
-    button{cursor:pointer;padding:8px 10px;border-radius:8px;border:1px solid var(--line);background:#fff}
-    #cv{border:1px dashed var(--line);background:#fff;border-radius:10px}
-  </style>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Bag Wizard (2 colores / 2 texturas + costura)</title>
+<style>
+  :root { --bg:#f7f7f9; --panel:#fff; --line:#e6e6e9; }
+  body{margin:0;background:var(--bg);font:15px/1.45 system-ui,Segoe UI,Roboto,Arial,sans-serif;color:#222}
+  .wrap{max-width:1100px;margin:24px auto;padding:0 16px}
+  h1{font-size:20px;margin:0 0 14px}
+  .grid{display:grid;grid-template-columns:340px 1fr;gap:16px}
+  .box{background:var(--panel);border:1px solid var(--line);border-radius:12px}
+  .panel{padding:14px}
+  .stage{display:flex;align-items:center;justify-content:center;padding:10px}
+  .row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:6px 0}
+  label{display:inline-flex;align-items:center;gap:8px}
+  select,input[type="color"],button{margin-left:6px}
+  button{cursor:pointer;padding:8px 10px;border-radius:8px;border:1px solid var(--line);background:#fff}
+  #cv{border:1px dashed var(--line);background:#fff;border-radius:10px;width:600px;height:800px}
+</style>
 </head>
 <body>
   <div class="wrap">
     <h1>Bag Wizard (2 colores / 2 texturas + costura)</h1>
 
     <div class="grid">
-      <!-- Controles -->
       <div class="box panel">
         <div class="row">
           <label>Grupo A · Textura
@@ -35,7 +33,7 @@
               <option value="suede">Ante</option>
             </select>
           </label>
-          <input id="colA" type="color" value="#e6e6e6" />
+          <input id="colA" type="color" value="#e6e6e6">
         </div>
 
         <div class="row">
@@ -45,31 +43,249 @@
               <option value="suede">Ante</option>
             </select>
           </label>
-          <input id="colB" type="color" value="#c61a1a" />
+          <input id="colB" type="color" value="#c61a1a">
         </div>
 
         <div class="row">
           <label>Grupo C · Costura (liso)</label>
-          <input id="stitchColor" type="color" value="#2a2a2a" />
+          <input id="stitchColor" type="color" value="#2a2a2a">
         </div>
 
         <div class="row">
           <button id="dl">Descargar preview</button>
           <button id="save">Ver JSON</button>
-          <input type="hidden" id="spbc_config_json" />
+          <input type="hidden" id="spbc_config_json">
         </div>
       </div>
 
-      <!-- Lienzo -->
       <div class="box stage">
         <canvas id="cv" width="600" height="800"></canvas>
       </div>
     </div>
   </div>
 
-  <!-- FabricJS desde CDN -->
+  <!-- FabricJS -->
   <script src="https://cdn.jsdelivr.net/npm/fabric@5.3.0/dist/fabric.min.js"></script>
-  <!-- Tu lógica (la versión con Grupo C). Ajusta el nombre si lo cambiaste -->
-  <script src="./customizer.js?v=3"></script>
+
+  <script>
+  (function(){
+    // ====== CONFIG ======
+    const SVG = 'assets/svg/bag_base.svg';      // Asegúrate que exista y se llame así
+    const TX  = {
+      smooth: 'assets/textures/leather_smooth.jpg',
+      suede:  'assets/textures/leather_suede.jpg',
+    };
+
+    // ====== UI ======
+    const $ = (s,c=document)=>c.querySelector(s);
+    const ui = {
+      texA:$('#texA'), colA:$('#colA'),
+      texB:$('#texB'), colB:$('#colB'),
+      stitch:$('#stitchColor'),
+      dl:$('#dl'), save:$('#save'), hidden:$('#spbc_config_json')
+    };
+
+    // ====== Canvas ======
+    const W=600,H=800;
+    const canvas=new fabric.Canvas('cv',{selection:false});
+    canvas.setWidth(W); canvas.setHeight(H);
+
+    // Debug bubble
+    const dbg=document.createElement('div');
+    Object.assign(dbg.style,{position:'fixed',top:'8px',right:'8px',background:'rgba(0,0,0,.85)',color:'#fff',
+      padding:'8px 10px',font:'12px/1.35 system-ui,Segoe UI,Roboto,Arial',borderRadius:'10px',zIndex:9999,maxWidth:'54ch'});
+    dbg.textContent='Cargando…'; document.body.appendChild(dbg);
+    const say=(t)=>dbg.innerHTML=t;
+
+    // Captura errores JS
+    window.addEventListener('error', e=>{ say('❌ Error JS: '+e.message); });
+
+    // ====== helpers ======
+    const getW=o=>typeof o.getScaledWidth==='function'?o.getScaledWidth():(o.width||0);
+    const getH=o=>typeof o.getScaledHeight==='function'?o.getScaledHeight():(o.height||0);
+    const bboxArea=o=>Math.max(1,getW(o)*getH(o));
+    const hasFill=o=>('fill' in o && o.fill && o.fill!=='none');
+    const hasStroke=o=>('stroke' in o && o.stroke && o.stroke!=='none');
+    const parseColor=(s)=>{
+      if(!s||typeof s!=='string') return null;
+      if(s==='none'||s.startsWith('url(')) return null;
+      if(s[0]==='#'){
+        const h=s.slice(1); const to=(x)=>parseInt(x,16);
+        if(h.length===3){const r=to(h[0]+h[0]),g=to(h[1]+h[1]),b=to(h[2]+h[2]);return [r,g,b,1];}
+        if(h.length>=6){return [to(h.slice(0,2)),to(h.slice(2,4)),to(h.slice(4,6)),1];}
+        return null;
+      }
+      const m=s.match(/rgba?\((\d+)[,\s]+(\d+)[,\s]+(\d+)(?:[,\s/]+([\d.]+))?\)/);
+      return m?[+m[1],+m[2],+m[3], m[4]!=null?+m[4]:1]:null;
+    };
+    const luma=([r,g,b])=>0.2126*r+0.7152*g+0.0722*b;
+    const nearGray=(rgb,t=24)=>Math.abs(rgb[0]-rgb[1])<t && Math.abs(rgb[0]-rgb[2])<t && Math.abs(rgb[1]-rgb[2])<t;
+
+    const fit=(g)=>{
+      const m=24,maxW=W-2*m,maxH=H-2*m;
+      const w=g.width||g.getScaledWidth(),h=g.height||g.getScaledHeight();
+      const s=Math.min(maxW/w,maxH/h);
+      g.scale(s);
+      g.set({left:(W-w*s)/2,top:(H-h*s)/2,selectable:false,evented:false});
+    };
+    const walk=(arr,fn)=>{ (function rec(a){ a.forEach(o=>{ fn(o); if(o._objects&&o._objects.length) rec(o._objects); }); })(arr); };
+    const leafs=(root)=>{ const out=[]; walk([root],o=>{ if(o._objects&&o._objects.length) return; if(o.type==='image') return; out.push(o); }); return out; };
+    const byId=(root)=>{ const map={}; walk([root], o=>{ if(o.id) map[o.id]=o; }); return map; };
+    const bringChildToTop=(parent,child)=>{ if(!parent||!parent._objects) return; const a=parent._objects,i=a.indexOf(child); if(i>=0){a.splice(i,1);a.push(child);parent.dirty=true;} };
+
+    // ====== texturas ======
+    function loadImg(src){ return new Promise(res=>{ if(!src){res(null);return;} const i=new Image(); i.crossOrigin='anonymous'; i.onload=()=>res(i); i.onerror=()=>res(null); i.src=src; }); }
+    function tintPattern(img,hex){
+      if(!img) return hex||'#ffffff';
+      const S=512, off=document.createElement('canvas'); off.width=S; off.height=S;
+      const ctx=off.getContext('2d');
+      ctx.drawImage(img,0,0,S,S);
+      ctx.globalCompositeOperation='multiply'; ctx.fillStyle=hex||'#ffffff'; ctx.fillRect(0,0,S,S);
+      ctx.globalCompositeOperation='destination-over'; ctx.fillStyle='#fff'; ctx.fillRect(0,0,S,S);
+      return new fabric.Pattern({ source: off, repeat:'repeat' });
+    }
+    const applyFill=(o,mat)=>{ if('fill' in o) o.set('fill',mat); else o.fill=mat; };
+
+    let imgSmooth=null, imgSuede=null;
+    Promise.all([loadImg(TX.smooth), loadImg(TX.suede)]).then(([a,b])=>{ imgSmooth=a; imgSuede=b; });
+
+    // ====== buckets ======
+    let bucketA=[], bucketB=[], stitchSet=new Set(), outlineSet=new Set(), mode='';
+
+    function detectOutlineAndStitch(root){
+      outlineSet=new Set(); stitchSet=new Set();
+      const ids = byId(root);
+      // 1) outline por id conocido
+      const gOutline = ids['body_x5F_clip'] || ids['outline'] || ids['outlines'] || null;
+      if(gOutline){
+        const leaves=[]; walk([gOutline],o=>{ if(o._objects&&o._objects.length) return; leaves.push(o); });
+        leaves.forEach(o=>{
+          outlineSet.add(o);
+          // si parece puntada (stroke fino claro), marcamos como stitch
+          const sw=('strokeWidth'in o)?(o.strokeWidth||0):0;
+          const sRGB=parseColor(o.stroke||'');
+          if(sw>0 && sRGB && luma(sRGB)>120) stitchSet.add(o);
+        });
+        const parent=gOutline.group||root; bringChildToTop(parent,gOutline);
+      }
+      // 2) heurística; puntadas = stroke fino claro; contorno = stroke fino oscuro o fill gris oscuro pequeño
+      const leavesAll=leafs(root);
+      const areaRoot=(root.getScaledWidth?.()||getW(root))*(root.getScaledHeight?.()||getH(root))||W*H;
+      leavesAll.forEach(o=>{
+        if(o.type==='image') return;
+        const sw=('strokeWidth'in o)?(o.strokeWidth||0):0;
+        const sRGB=parseColor(o.stroke||''); const fRGB=parseColor(o.fill||'');
+        if(sw>0 && sRGB){
+          if(luma(sRGB)>150 && sw<=2.2){ stitchSet.add(o); return; }
+          if(luma(sRGB)<90 && sw<=4){ outlineSet.add(o); return; }
+        }
+        if(hasFill(o) && fRGB && nearGray(fRGB,28) && luma(fRGB)<90 && bboxArea(o)<=areaRoot*0.02){
+          outlineSet.add(o);
+        }
+      });
+    }
+
+    function buildBuckets(root){
+      const ids = byId(root);
+      const all = leafs(root).filter(o=>!outlineSet.has(o) && !stitchSet.has(o));
+
+      // ids explícitos
+      if(ids['stripe1'] && ids['stripe2']){
+        const A=leafs(ids['stripe1']).filter(o=>!outlineSet.has(o)&&!stitchSet.has(o));
+        const B=leafs(ids['stripe2']).filter(o=>!outlineSet.has(o)&&!stitchSet.has(o));
+        if(A.length && B.length){ bucketA=A; bucketB=B; mode='ids'; return; }
+      }
+      // fallback: dividir por X
+      const cx=(o)=>{ const r=o.getBoundingRect(true,true); return r.left+r.width/2; };
+      const xs=all.map(cx); const min=Math.min(...xs), max=Math.max(...xs);
+      const mid=(min+max)/2;
+      bucketA=all.filter(o=>cx(o)<=mid); bucketB=all.filter(o=>cx(o)>mid); mode='auto-geom';
+    }
+
+    function styleOutlineAndStitch(root){
+      // outline: negro
+      outlineSet.forEach(o=>{
+        if(hasStroke(o) && !hasFill(o)){
+          o.set({fill:'none',stroke:'#111',strokeWidth:1.4,strokeLineCap:'round',strokeLineJoin:'round',strokeUniform:true,opacity:1});
+        }else{
+          o.set({fill:'#111',stroke:null,strokeWidth:0,opacity:1});
+        }
+        if(o.group) bringChildToTop(o.group,o);
+        o.dirty=true;
+      });
+      // stitch: color variable (pero sin textura)
+      const color = ui.stitch.value || '#2a2a2a';
+      stitchSet.forEach(o=>{
+        if(hasStroke(o)){
+          o.set({stroke:color, strokeUniform:true, opacity:1});
+        }else{
+          o.set({fill:color, opacity:1});
+        }
+        if(o.group) bringChildToTop(o.group,o);
+        o.dirty=true;
+      });
+    }
+
+    function paint(){
+      const colA = ui.colA.value||'#e6e6e6';
+      const colB = ui.colB.value||'#c61a1a';
+      const matA = tintPattern(ui.texA.value==='suede'?imgSuede:imgSmooth, colA);
+      const matB = tintPattern(ui.texB.value==='suede'?imgSuede:imgSmooth, colB);
+
+      bucketA.forEach(o=>{ applyFill(o,matA); o.dirty=true; });
+      bucketB.forEach(o=>{ applyFill(o,matB); o.dirty=true; });
+      styleOutlineAndStitch(rootGroup);
+      canvas.requestRenderAll();
+    }
+
+    let rootGroup=null;
+
+    // Carga SVG (con mensajes claros si falla)
+    fabric.util.request(SVG, {
+      method: 'GET',
+      onComplete: function(xhr){
+        if(xhr.status!==200){ say('❌ No se pudo cargar <b>'+SVG+'</b> (HTTP '+xhr.status+'). Revisa ruta/nombre.'); return; }
+        // Carga real con fabric
+        fabric.loadSVGFromString(xhr.responseText, (objs, opts)=>{
+          if(!objs || !objs.length){ say('❌ SVG sin objetos. Abre '+SVG+' y verifica contenido.'); return; }
+          rootGroup = fabric.util.groupSVGElements(objs, opts);
+          fit(rootGroup); canvas.add(rootGroup);
+
+          detectOutlineAndStitch(rootGroup);
+          buildBuckets(rootGroup);
+          styleOutlineAndStitch(rootGroup);
+          paint();
+
+          // resumen
+          say('✅ SVG cargado ('+mode+') · A:'+bucketA.length+' · B:'+bucketB.length+' · outline:'+outlineSet.size+' · stitch:'+stitchSet.size);
+        }, (item, obj)=>{ obj.selectable=false; });
+      }
+    });
+
+    // Eventos UI
+    ['change','input'].forEach(ev=>{
+      ui.colA.addEventListener(ev, paint);
+      ui.colB.addEventListener(ev, paint);
+      ui.texA.addEventListener(ev, paint);
+      ui.texB.addEventListener(ev, paint);
+      ui.stitch.addEventListener(ev, paint);
+    });
+
+    ui.dl.addEventListener('click', ()=>{
+      const data=canvas.toDataURL({format:'png',multiplier:1.5});
+      const a=document.createElement('a'); a.href=data; a.download='bolso-preview.png'; a.click();
+    });
+    ui.save.addEventListener('click', ()=>{
+      ui.hidden.value = JSON.stringify({
+        model:'bucket-01', mode,
+        A:{ texture: ui.texA.value, color: ui.colA.value },
+        B:{ texture: ui.texB.value, color: ui.colB.value },
+        C:{ stitch: ui.stitch.value },
+        version:'1.1.0'
+      });
+      alert(ui.hidden.value);
+    });
+  })();
+  </script>
 </body>
 </html>
