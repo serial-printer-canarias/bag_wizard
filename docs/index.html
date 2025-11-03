@@ -9,12 +9,12 @@
   :root{
     --bg:#f7f7f9;
     --ink:#221E1B;
-    --line:#ececec;
-    --rose:#E7BFC2;
-    --terra:#8C5A45;
+    --rose:#E7BFC2;           /* botones / chip color */
+    --terra:#8C5A45;          /* texto principal (Valonia) */
+    --frameW: min(88vw, 540px);  /* ancho visual del canvas y del panel */
   }
 
-  /* Carga local de Didot LP (si tienes licencia). Coloca el archivo aquí: assets/fonts/DidotLP.woff2 */
+  /* Didot LP local (opcional). Si no existe usa fallback. */
   @font-face{
     font-family:"Didot LP";
     src:url("assets/fonts/DidotLP.woff2") format("woff2");
@@ -25,95 +25,110 @@
   body{font:15px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif}
 
   /* Cabecera Valonia */
-  .brand{display:flex;flex-direction:column;align-items:center;gap:10px;margin:22px 0 10px}
-  .brand img{height:72px;object-fit:contain;display:block}
+  .brand{
+    display:flex;flex-direction:column;align-items:center;
+    gap:14px; margin:26px 0 18px;
+  }
+  .brand img{height:86px;object-fit:contain;display:block}
   .brand h1{
     margin:0;
     font-family:"Didot LP","Didot","Bodoni Moda","Playfair Display",Times,serif;
-    font-weight:400; font-size:30px; line-height:1.2;
+    font-weight:400; font-size:22px; line-height:1.2;
     letter-spacing:.02em; color:var(--terra);
   }
 
-  /* Layout */
-  .wrap{max-width:1200px;margin:0 auto;padding:0 18px 28px}
-  .grid{display:grid;grid-template-columns:340px 1fr;gap:24px;align-items:start}
-  @media (max-width:980px){ .grid{grid-template-columns:1fr;gap:18px} }
+  /* Contenedor principal en columna */
+  .wrap{max-width:1200px;margin:0 auto;padding:0 18px 36px}
 
-  /* Panel de controles (limpio y fino) */
-  .panel{background:transparent;border:1px solid var(--line);border-radius:14px;padding:16px}
-  .row{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:10px 0}
-  label{font-weight:600;letter-spacing:.02em;color:var(--terra)}
+  /* Escenario centrado, sin bordes */
+  .stage{
+    width:var(--frameW); margin:0 auto 14px auto;
+    display:flex;justify-content:center;align-items:center;
+    background:transparent;border:none;padding:0;
+  }
+  /* Canvas responsive por CSS (no tocamos objetos internos) */
+  #cv{display:block;width:100%;height:auto;background:transparent;border:none;border-radius:0}
+
+  /* Panel de opciones centrado bajo el canvas */
+  .options{
+    width:var(--frameW); margin:0 auto;
+    background:transparent; border:none; padding:0;
+  }
+  .row{
+    display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+    margin:10px 0;
+  }
+  .lbl{
+    font-family:"Didot LP","Didot","Bodoni Moda","Playfair Display",Times,serif;
+    font-weight:400; font-size:12px; letter-spacing:.12em; text-transform:uppercase;
+    color:var(--terra);
+  }
   select{
     appearance:none;-webkit-appearance:none;
-    border:1px solid var(--line);border-radius:12px;padding:8px 36px 8px 12px;background:#fff;font-size:14px
+    border:1px solid #e9e9e9; border-radius:12px;
+    padding:6px 30px 6px 10px; background:#fff; font-size:13px;
   }
-  input[type="color"]{width:44px;height:44px;border-radius:12px;border:2px solid #efefef;background:#fff;box-shadow:0 1px 0 rgba(0,0,0,.03)}
-  .row--stitch{display:none} /* ocultamos control de costura */
-
-  .actions{display:flex;gap:12px;flex-wrap:wrap;margin-top:6px}
-  button{cursor:pointer;border-radius:12px;padding:10px 16px;font-weight:600;border:1px solid var(--line);background:var(--rose);color:#5a3a2c}
-  .ghost{background:#fff;color:var(--ink)}
-
-  /* Escenario: sin bordes ni “grids” */
-  .stage{background:transparent;border:none;border-radius:0;padding:0;display:flex;justify-content:center;align-items:center}
-
-  /* Canvas responsive por CSS (no toca objetos) */
-  #cv{
-    display:block;background:transparent;border:none;border-radius:0;
-    width:clamp(260px, 56vw, 520px);   /* desktop: más contenido y elegante */
-    height:auto;                       /* mantiene proporción 600x800 */
+  input[type="color"]{
+    width:30px;height:30px;border-radius:50%;
+    border:2px solid #efefef;background:#fff;box-shadow:0 1px 0 rgba(0,0,0,.03);
   }
-  @media (max-width:980px){
-    #cv{ width: min(88vw, 520px); }    /* móvil: que entre cómodo de primera */
+  .row--stitch{display:none} /* ocultamos el control de costura */
+
+  .actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:6px}
+  button{
+    cursor:pointer;border-radius:12px;padding:9px 14px;font-weight:600;
+    border:1px solid #e9e9e9;background:var(--rose);color:#5a3a2c
+  }
+
+  /* Desktop un poco más contenido aún */
+  @media (min-width:1100px){
+    :root{ --frameW: 520px; }
   }
 </style>
 </head>
 <body>
 
-  <!-- Logo y título -->
+  <!-- Logo + título -->
   <div class="brand">
-    <!-- Usa el PNG adjunto: colócalo en assets/img/logo-valonia.png -->
+    <!-- coloca el PNG en assets/img/logo-valonia.png -->
     <img src="assets/img/logo-valonia.png" alt="Valonia">
     <h1>Diseña tu Tambour</h1>
   </div>
 
   <div class="wrap">
-    <div class="grid">
-      <!-- Controles -->
-      <div class="panel">
-        <div class="row">
-          <label>GRUPO A · TEXTURA</label>
-          <select id="texA">
-            <option value="smooth">Lisa</option>
-            <option value="suede">Ante</option>
-          </select>
-          <input id="colA" type="color" value="#E7BFC2">
-        </div>
+    <!-- Canvas centrado -->
+    <div class="stage">
+      <canvas id="cv" width="600" height="800"></canvas>
+    </div>
 
-        <div class="row">
-          <label>GRUPO B · TEXTURA</label>
-          <select id="texB">
-            <option value="smooth">Lisa</option>
-            <option value="suede">Ante</option>
-          </select>
-          <input id="colB" type="color" value="#8C5A45">
-        </div>
-
-        <div class="row row--stitch">
-          <label>COSTURA (C)</label>
-          <input id="stitchColor" type="color" value="#111111">
-        </div>
-
-        <div class="actions">
-          <button id="dl">Descargar preview</button>
-          <!-- “Ver JSON” eliminado -->
-          <input type="hidden" id="spbc_config_json">
-        </div>
+    <!-- Opciones centradas (debajo del canvas) -->
+    <div class="options">
+      <div class="row">
+        <span class="lbl">1º cuero · textura</span>
+        <select id="texA" aria-label="Textura del primer cuero">
+          <option value="smooth">Lisa</option>
+          <option value="suede">Ante</option>
+        </select>
+        <input id="colA" type="color" value="#E7BFC2" aria-label="Color del primer cuero">
       </div>
 
-      <!-- Escenario -->
-      <div class="stage">
-        <canvas id="cv" width="600" height="800"></canvas>
+      <div class="row">
+        <span class="lbl">2º cuero · textura</span>
+        <select id="texB" aria-label="Textura del segundo cuero">
+          <option value="smooth">Lisa</option>
+          <option value="suede">Ante</option>
+        </select>
+        <input id="colB" type="color" value="#8C5A45" aria-label="Color del segundo cuero">
+      </div>
+
+      <div class="row row--stitch">
+        <span class="lbl">Costura (C)</span>
+        <input id="stitchColor" type="color" value="#111111" aria-label="Color de la costura">
+      </div>
+
+      <div class="actions">
+        <button id="dl">Descargar preview</button>
+        <input type="hidden" id="spbc_config_json">
       </div>
     </div>
   </div>
