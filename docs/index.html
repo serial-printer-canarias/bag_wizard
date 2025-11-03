@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Tambour • Wizard</title>
   <style>
-    :root{ --bg:#f6f6f6; --card:#fff; --muted:#6b7280; --radius:14px; }
+    :root{ --bg:#f5f6f7; --card:#fff; --muted:#6b7280; --radius:14px; }
     *{ box-sizing:border-box }
     html,body{ height:100% }
     body{
@@ -17,8 +17,17 @@
     .grid{ display:grid; grid-template-columns:1.4fr 1fr; gap:18px }
     .card{ background:var(--card); border:1px solid #e5e7eb; border-radius:var(--radius);
            box-shadow:0 1px 2px rgba(0,0,0,.05), 0 10px 30px rgba(0,0,0,.06); }
-    .stage{ padding:18px }
-    canvas{ width:100%; height:auto; display:block; border-radius:12px; background:#fff }
+    .stage{ position:relative; padding:18px }
+    /* fondo suave estilo Valonia */
+    .stage::before{
+      content:""; position:absolute; inset:18px; border-radius:12px;
+      background:
+        radial-gradient(1200px 600px at 20% 0%, rgba(0,0,0,.04), transparent 60%),
+        radial-gradient(900px 500px at 90% 30%, rgba(0,0,0,.03), transparent 55%),
+        #ffffff;
+      pointer-events:none;
+    }
+    canvas{ width:100%; height:auto; display:block; border-radius:12px; background:transparent; position:relative; z-index:1 }
     .panel{ padding:18px }
     h1{ margin:0 0 4px 0; font-size:28px }
     .sub{ margin:0 0 18px 0; color:var(--muted) }
@@ -34,6 +43,13 @@
     }
     .btn{ padding:10px 14px; border-radius:12px; border:1px solid #e5e7eb; background:#fff; font-weight:700; cursor:pointer }
     .muted{ color:var(--muted); font-size:14px }
+
+    .fallback{
+      position:absolute; inset:18px; display:flex; align-items:center; justify-content:center; z-index:2;
+      border-radius:12px; background:#fff; border:1px dashed #d1d5db; color:#374151; gap:12px;
+      font-weight:600; visibility:hidden;
+    }
+    .fallback.show{ visibility:visible; }
     @media (max-width: 980px){ .grid{ grid-template-columns:1fr } }
   </style>
 </head>
@@ -42,6 +58,11 @@
     <div class="grid">
       <div class="card stage">
         <canvas id="cv" width="800" height="900" aria-label="Vista del bolso"></canvas>
+        <div id="fallback" class="fallback">
+          <span>No encuentro <code>assets/svg/bag_base.svg</code></span>
+          <button id="btnFile" class="btn">Cargar SVG desde mi equipo…</button>
+          <input id="fileSvg" type="file" accept=".svg" style="display:none" />
+        </div>
       </div>
       <div class="card panel">
         <h1>Tambour</h1>
