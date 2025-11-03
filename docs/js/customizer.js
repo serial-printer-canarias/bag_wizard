@@ -17,14 +17,14 @@
   const canvas=new fabric.Canvas('cv',{selection:false});
   canvas.setWidth(W); canvas.setHeight(H);
 
-  // Debug overlay
+  // Debug
   const dbg=document.createElement('div');
   Object.assign(dbg.style,{position:'fixed',top:'8px',right:'8px',background:'rgba(0,0,0,.85)',color:'#fff',
     padding:'8px 10px',font:'12px/1.35 system-ui,Segoe UI,Roboto,Arial',borderRadius:'10px',zIndex:9999,maxWidth:'48ch'});
   dbg.textContent='Cargando…'; document.body.appendChild(dbg);
 
   let mode=''; // 'ids' | 'auto-mix' | 'auto-geom'
-  let bucketA=[], bucketB=[];
+  let bucketA=[], bucketB=[], outlineObjs=[];
   let imgSmooth=null, imgSuede=null;
 
   // ---------- helpers ----------
@@ -74,12 +74,12 @@
     const a = c[3]==null?1:c[3];
     return a>0.02;
   }
-  // Outline: sin fill visible + stroke gris/negro oscuro y fino
+  // Outline: sin fill + stroke oscuro y fino
   function isOutline(o){
     const sw=('strokeWidth' in o)?(o.strokeWidth||0):0;
     const sRGB=('stroke' in o)?parseColor(o.stroke):null;
-    const dark = sRGB && (luma(sRGB)<70) && nearGray(sRGB,22);
-    return !hasVisibleFill(o) && dark && sw<=3;
+    const dark = sRGB && (luma(sRGB)<80) && nearGray(sRGB,30);
+    return !hasVisibleFill(o) && dark && sw<=4;
   }
   function baseRGB(o){
     if(hasVisibleFill(o)){
@@ -106,57 +106,41 @@
   function areaMetric(o){ return hasVisibleFill(o) ? bboxArea(o) : Math.max(1,(o.strokeWidth||1)*5); }
 
   // ---------- clustering ----------
-  // mezcla HUE + posición X (normalizada) con pesos
   function kmeans2_mix(objs){
     if(objs.length<=2) return {A:objs, B:[]};
 
-    const weightHue = 1.0;   // aporta color
-    const weightPos = 0.6;   // ayuda a separar franjas (izq/der) y asa
+    const weightHue = 1.0, weightPos = 0.6;
     const items = objs.map(o=>{
       const rgb = baseRGB(o);
-      let hx=0, hy=0, hasHue=false;
+      let hx=0, hy=0;
       if(rgb){
         const [h,s,v]=rgb2hsv(rgb);
-        // si es muy oscuro/gris, no usamos hue
-        if(!(s<0.18 || v<0.28)){
+        if(!(s<0.18 || v<0.28)){ // ignora grises/muy oscuros
           const rad=h*Math.PI/180;
           hx = Math.cos(rad)*weightHue;
           hy = Math.sin(rad)*weightHue;
-          hasHue=true;
         }
       }
       const x = centerX(o);
-      return {o, hx, hy, x, hasHue, w:areaMetric(o)};
+      return {o, hx, hy, x, w:areaMetric(o)};
     });
 
-    // normalizar X a [0,1]
     const xs=items.map(i=>i.x);
     const minX=Math.min(...xs), maxX=Math.max(...xs) || (minX+1);
     items.forEach(i=>{ i.p = ((i.x-minX)/(maxX-minX))*weightPos; });
 
-    // inicialización: extremos por X
     let c1={hx:0,hy:0,p:Math.min(...items.map(i=>i.p))};
     let c2={hx:0,hy:0,p:Math.max(...items.map(i=>i.p))};
 
-    function dist(a,b){
-      const dx=a.hx-b.hx, dy=a.hy-b.hy, dp=a.p-b.p;
-      return dx*dx+dy*dy+dp*dp;
-    }
-    function mean(arr){
-      const W=arr.reduce((s,i)=>s+i.w,0)||1;
-      const sx=arr.reduce((s,i)=>s+i.hx*i.w,0)/W;
-      const sy=arr.reduce((s,i)=>s+i.hy*i.w,0)/W;
-      const sp=arr.reduce((s,i)=>s+i.p*i.w,0)/W;
-      return {hx:sx,hy:sy,p:sp};
-    }
+    const dist=(a,b)=>{ const dx=a.hx-b.hx, dy=a.hy-b.hy, dp=a.p-b.p; return dx*dx+dy*dy+dp*dp; };
+    const mean=(arr)=>{ const W=arr.reduce((s,i)=>s+i.w,0)||1;
+      return {hx:arr.reduce((s,i)=>s+i.hx*i.w,0)/W, hy:arr.reduce((s,i)=>s+i.hy*i.w,0)/W, p:arr.reduce((s,i)=>s+i.p*i.w,0)/W};
+    };
 
     for(let it=0; it<10; it++){
       const A=[],B=[];
-      items.forEach(i=>{
-        (dist(i,c1) <= dist(i,c2) ? A : B).push(i);
-      });
-      if(A.length===0 || B.length===0){
-        // resembrar: forzar median split por X
+      items.forEach(i=>{ (dist(i,c1) <= dist(i,c2) ? A : B).push(i); });
+      if(!A.length || !B.length){
         const median = items.map(i=>i.p).sort((a,b)=>a-b)[Math.floor(items.length/2)];
         const A2=items.filter(i=>i.p<=median), B2=items.filter(i=>i.p>median);
         return {A:A2.map(i=>i.o), B:B2.map(i=>i.o)};
@@ -171,7 +155,6 @@
     items.forEach(i=>{ (dist(i,c1)<=dist(i,c2)?A:B).push(i); });
     return {A:A.map(i=>i.o), B:B.map(i=>i.o)};
   }
-
   function kmeans2X(objs){
     if(objs.length<=2) return [objs,[]];
     const xs=objs.map(o=>centerX(o));
@@ -200,13 +183,36 @@
     ctx.globalCompositeOperation='destination-over'; ctx.fillStyle='#fff'; ctx.fillRect(0,0,S,S);
     return new fabric.Pattern({ source: off, repeat:'repeat' });
   }
-  function applyFill(o,material){ if('fill' in o) o.set('fill',material); else o.fill=material; }
+  const applyFill=(o,mat)=>{ if('fill' in o) o.set('fill',mat); else o.fill=mat; };
+
+  // ----- outline: forzar estilo y traer al frente dentro del grupo -----
+  function bringToGroupTop(o){
+    const p=o.group; if(!p||!p._objects) return;
+    const idx=p._objects.indexOf(o);
+    if(idx>=0){ p._objects.splice(idx,1); p._objects.push(o); p.dirty=true; }
+  }
+  function styleOutlines(root){
+    outlineObjs = leafs(root).filter(isOutline);
+    outlineObjs.forEach(o=>{
+      o.set({
+        fill:'none',               // jamás se pinta relleno
+        stroke:'#111',             // negro
+        strokeWidth:1.2,
+        strokeLineCap:'round',
+        strokeLineJoin:'round',
+        strokeUniform:true,
+        opacity:1
+      });
+      bringToGroupTop(o);
+    });
+  }
 
   // buckets
   function buildBuckets(root){
-    const all = leafs(root).filter(o=>!isOutline(o));
+    const allLeaves = leafs(root);
+    const paintables = allLeaves.filter(o=>!isOutline(o));
 
-    // 1) ids si tienen contenido real
+    // 1) ids
     const ids=idsMap(root._objects?root._objects:[root]);
     if(ids['stripe1'] && ids['stripe2']){
       const A=leafs(ids['stripe1']).filter(o=>!isOutline(o));
@@ -218,16 +224,16 @@
       }
     }
 
-    // 2) auto-mix (color + posición)
-    const {A,B} = kmeans2_mix(all);
+    // 2) auto-mix
+    const {A,B} = kmeans2_mix(paintables);
     if(A.length && B.length){
       bucketA=A; bucketB=B; mode='auto-mix';
       dbg.innerHTML=`✅ SVG cargado (modo <b>auto-mix</b>) · A: ${A.length} objs · B: ${B.length} objs`;
       return;
     }
 
-    // 3) auto-geom por X
-    const [AX,BX]=kmeans2X(all);
+    // 3) auto-geom
+    const [AX,BX]=kmeans2X(paintables);
     bucketA=AX; bucketB=BX; mode='auto-geom';
     dbg.innerHTML=`✅ SVG cargado (modo <b>auto-geom</b>) · A: ${AX.length} objs · B: ${BX.length} objs`;
   }
@@ -237,8 +243,13 @@
     const colA=ui.colA.value||'#e6e6e6', colB=ui.colB.value||'#c61a1a';
     const patA=tintPattern(ui.texA.value==='suede'?imgSuede:imgSmooth, colA);
     const patB=tintPattern(ui.texB.value==='suede'?imgSuede:imgSmooth, colB);
+
     bucketA.forEach(o=>{ applyFill(o, patA); o.dirty=true; });
     bucketB.forEach(o=>{ applyFill(o, patB); o.dirty=true; });
+
+    // asegurar outline arriba y con stroke negro
+    outlineObjs.forEach(o=>{ o.set({fill:'none', stroke:'#111'}); bringToGroupTop(o); o.dirty=true; });
+
     canvas.requestRenderAll();
   }
 
@@ -247,6 +258,9 @@
   fabric.loadSVGFromURL(SVG,(objs,opts)=>{
     const root=fabric.util.groupSVGElements(objs,opts);
     fit(root); canvas.add(root);
+
+    // preparar outline y grupos
+    styleOutlines(root);
     buildBuckets(root);
     paint();
   },(item,obj)=>{ obj.selectable=false; });
