@@ -28,7 +28,7 @@
 
   .wrap{max-width:1200px;margin:0 auto;padding:clamp(10px,3vw,20px)}
 
-  /* Logo inline (puedes reemplazar el texto por tu SVG real) */
+  /* Logo inline (sustituye el <text> por tu SVG real si quieres) */
   .brand{display:flex;justify-content:center;align-items:center;margin:6px 0 6px}
   .logo-valonia{height:40px;display:block}
   .logo-valonia *{vector-effect:non-scaling-stroke}
@@ -40,7 +40,7 @@
     color:var(--terracotta); text-align:center; letter-spacing:.2px;
   }
 
-  /* Layout limpio */
+  /* Layout */
   .grid{
     display:grid; gap:12px;
     grid-template-columns:320px 1fr;
@@ -52,11 +52,12 @@
     .grid{grid-template-columns:1fr; grid-template-areas:"stage" "controls"}
   }
 
+  /* Tarjetas minimal */
   .box{background:transparent;border:0;border-radius:var(--r-lg);box-shadow:none}
   .panel{padding:10px}
   .stage{display:flex;align-items:center;justify-content:center;padding:6px}
 
-  /* Controles mínimos */
+  /* Controles */
   .row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:10px 0}
   label{display:inline-flex;align-items:center;gap:10px}
   label span, label{
@@ -74,7 +75,7 @@
     box-shadow:inset 0 0 0 1px rgba(0,0,0,.08); cursor:pointer;
   }
 
-  /* Botones rosa pastel */
+  /* Botones */
   button{
     cursor:pointer; padding:10px 16px; border-radius:12px;
     border:1px solid var(--line); background:#fff;
@@ -84,7 +85,7 @@
   #dl{ background:var(--pink); border-color:transparent; color:var(--terracotta) }
   button:hover{transform:translateY(-1px)}
 
-  /* ===== PREVIEW PROPORCIONAL (marco 3:4) ===== */
+  /* ===== PREVIEW: marco 3:4 para evitar deformación ===== */
   .cv-frame{
     width: clamp(260px, 40vw, 420px);  /* desktop */
     aspect-ratio: 3 / 4;               /* 600x800 */
@@ -96,11 +97,11 @@
   }
   @media (max-width:980px){
     .cv-frame{
-      width: min(86vw, calc(48vh * .75));  /* encaja en móvil y respeta 3:4 */
+      width: min(86vw, calc(48vh * .75)); /* móvil, manteniendo 3:4 */
       aspect-ratio: 3 / 4;
     }
   }
-  /* El canvas rellena el marco */
+  /* El canvas rellena el marco (tamaño visual = tamaño backstore) */
   #cv{ width:100% !important; height:100% !important; display:block; }
 </style>
 </head>
@@ -149,46 +150,66 @@
       </div>
 
       <div class="box stage">
-        <!-- Mantén 600x800; el marco gobierna la vista -->
         <div class="cv-frame">
+          <!-- Mantén 600x800; el JS ajusta zoom/centro -->
           <canvas id="cv" width="600" height="800"></canvas>
         </div>
       </div>
     </div>
   </div>
 
-  <!-- Librería y tu JS -->
+  <!-- Librerías originales -->
   <script src="https://cdn.jsdelivr.net/npm/fabric@5.3.0/dist/fabric.min.js"></script>
   <script src="js/customizer.js"></script>
 
-  <!-- 🔧 Auto-encaje real del contenido (sin tocar tu customizer.js) -->
+  <!-- 🔧 ENCAJE DURO: tras cada "add" de Fabric y en resize -->
   <script>
   (function(){
     const el = document.getElementById('cv');
-    let resizing = false, lastFitAt = 0;
 
+    // 1) Hook a 'add' para encajar después de que tu JS meta el SVG
+    const _add = fabric.Canvas.prototype.add;
+    fabric.Canvas.prototype.add = function(){
+      const r = _add.apply(this, arguments);
+      scheduleFit(this);
+      return r;
+    };
+
+    // 2) Utilidades
     function findCanvas(){
-      if (window.canvas && window.canvas.lowerCanvasEl === el) return window.canvas;
-      if (window.cv && window.cv.lowerCanvasEl === el) return window.cv;
-      const cand = [el.__canvas, el.fabric, el._fabric, el._canvas, el.canvas];
-      for (const c of cand) if (c && c.lowerCanvasEl === el) return c;
+      // Preferimos la instancia cuyo lowerCanvasEl es #cv
+      const candidates = [window.canvas, window.cv, el.__canvas, el.fabric, el._fabric, el._canvas, el.canvas];
+      for (const c of candidates) if (c && c.lowerCanvasEl === el) return c;
+      // Scan por si la guardan con otro nombre
       for (const k in window){
-        try{ const v = window[k];
+        try{
+          const v = window[k];
           if (v && v.lowerCanvasEl === el && typeof v.getObjects === 'function') return v;
         }catch(e){}
       }
       return null;
     }
 
-    // Calcula el bounding "real" ignorando el viewport actual
+    function sizeBackstoreToFrame(){
+      const frame = el.parentElement;
+      const w = Math.max(1, frame.clientWidth);
+      const h = Math.max(1, frame.clientHeight);
+      const c = findCanvas();
+      if (c && typeof c.setDimensions === 'function'){
+        c.setDimensions({ width:w, height:h }, { backstoreOnly:false });
+      } else {
+        el.width = w; el.height = h; el.style.width = w+'px'; el.style.height = h+'px';
+      }
+    }
+
     function getWorldBounds(c){
       const objs = c.getObjects().filter(o => o && o.visible !== false);
       if (!objs.length) return null;
-
-      // Guardar/limpiar VPT para medir con aCoords
-      const vpt = c.viewportTransform ? c.viewportTransform.slice() : [1,0,0,1,0,0];
+      // Medimos sin viewport transform para evitar recortes raros
+      const old = c.viewportTransform ? c.viewportTransform.slice() : [1,0,0,1,0,0];
       c.setViewportTransform([1,0,0,1,0,0]);
       c.renderAll();
+
       let minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;
       for (const o of objs){
         o.setCoords();
@@ -198,78 +219,68 @@
         maxX = Math.max(maxX, a.tl.x, a.tr.x, a.bl.x, a.br.x);
         maxY = Math.max(maxY, a.tl.y, a.tr.y, a.bl.y, a.br.y);
       }
-      // Restaurar VPT
-      c.setViewportTransform(vpt);
-      return {minX, minY, maxX, maxY, w:maxX-minX, h:maxY-minY};
+      c.setViewportTransform(old);
+      return { w:maxX-minX, h:maxY-minY, cx:minX + (maxX-minX)/2, cy:minY + (maxY-minY)/2 };
     }
 
-    function sizeBackstoreToFrame(){
-      const frame = el.parentElement; // .cv-frame
-      const w = Math.max(1, Math.floor(frame.clientWidth));
-      const h = Math.max(1, Math.floor(frame.clientHeight));
-      const c = findCanvas();
-      if (c && typeof c.setDimensions === 'function'){
-        c.setDimensions({ width:w, height:h }, { backstoreOnly:false });
-      }else{
-        el.width = w; el.height = h; el.style.width = w+'px'; el.style.height = h+'px';
-      }
+    let raf, lastW=0, lastH=0;
+    function scheduleFit(c){
+      if (raf) cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(()=>fitAll(c || findCanvas()));
     }
 
-    function fitAll(pad=16){
-      const c = findCanvas();
+    function fitAll(c){
       if (!c) return;
+      // 1) sincronizar tamaño interno con el marco visual
+      sizeBackstoreToFrame();
+
+      // 2) calcular bounds "reales" de todo el bolso
       const b = getWorldBounds(c);
       if (!b || b.w<=0 || b.h<=0) return;
 
+      const pad = 18;
       const cw = c.getWidth()  - pad*2;
       const ch = c.getHeight() - pad*2;
 
+      // 3) zoom para encajar completo
       const zoom = Math.min(cw / b.w, ch / b.h);
+
+      // 4) centro del canvas y del contenido
       const cx = c.getWidth()/2, cy = c.getHeight()/2;
-      const ox = b.minX + b.w/2,  oy = b.minY + b.h/2;
 
-      c.setViewportTransform([zoom,0,0,zoom, cx - ox*zoom, cy - oy*zoom]);
+      // 5) aplicar viewport transform (zoom + translate)
+      c.setViewportTransform([zoom,0,0,zoom, cx - b.cx*zoom, cy - b.cy*zoom ]);
       c.requestRenderAll();
-      lastFitAt = Date.now();
+
+      lastW = c.getWidth(); lastH = c.getHeight();
     }
 
-    function refresh(){
-      if (resizing) return;
-      resizing = true;
-      requestAnimationFrame(()=>{
-        sizeBackstoreToFrame();
-        fitAll(18);
-        resizing = false;
-      });
-    }
-
-    function bootstrap(){
-      let tries=0;
-      const t = setInterval(()=>{
-        tries++;
+    // Bootstrap cuando la página y tu wizard terminan de crear el canvas
+    window.addEventListener('load', ()=>{
+      // varios intentos porque el SVG carga asíncrono
+      let tries = 0;
+      const ticker = setInterval(()=>{
         const c = findCanvas();
         if (c && c.getObjects().length){
-          clearInterval(t);
-          refresh();
+          clearInterval(ticker);
+          // encaje inicial + unos reajustes rápidos al principio
+          fitAll(c);
+          let n=0; const k = setInterval(()=>{ fitAll(c); if(++n>8) clearInterval(k); }, 180);
 
-          // Re-encajar en los primeros segundos (carga SVG asíncrona)
-          let n=0, kick = setInterval(()=>{
-            refresh();
-            if (++n>8) clearInterval(kick);
-          }, 180);
-
-          // Re-encajar cuando cambian cosas
-          c.on && c.on('object:added',   ()=>setTimeout(()=>{ if(Date.now()-lastFitAt>50) refresh(); },50));
-          c.on && c.on('object:modified',()=>setTimeout(refresh,50));
+          // escucha cambios del propio Fabric
+          c.on && c.on('object:added',    ()=>scheduleFit(c));
+          c.on && c.on('object:modified', ()=>scheduleFit(c));
+          c.on && c.on('after:render',    ()=>{
+            // si el backstore cambió de tamaño (rotación, barra superior iOS, etc.), reencaja
+            if (c.getWidth()!==lastW || c.getHeight()!==lastH) scheduleFit(c);
+          });
         }
-        if (tries>60) clearInterval(t); // ~12s timeout
+        if (++tries>60) clearInterval(ticker); // ~12s
       }, 200);
-    }
+    });
 
-    window.addEventListener('load',  ()=>setTimeout(bootstrap, 60));
-    window.addEventListener('resize',()=>setTimeout(refresh, 60));
-    // Exponer util por si lo quieres llamar manualmente
-    window.fitPreview = refresh;
+    // Reencajar en rotaciones/resize
+    window.addEventListener('resize', ()=>scheduleFit(findCanvas()));
   })();
   </script>
 </body>
