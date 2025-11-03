@@ -1,63 +1,67 @@
 <!doctype html>
 <html lang="es">
 <head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>VALONIA · Tambour – Personalizador</title>
-<meta name="description" content="Personaliza el bolso Tambour: 2 colores / 2 texturas.">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>VALONIA · Tambour — Personalizador</title>
+<meta name="description" content="Personaliza el bolso Tambour: 2 colores y 2 texturas con previsualización.">
 <style>
   :root{
     /* Paleta sobria tipo Valonia */
-    --bg:#f6f7f8;
+    --bg:#f7f7f7;
     --panel:#ffffff;
-    --line:#e8e8eb;
+    --line:#e6e6e6;
     --ink:#111111;
-    --muted:#6b6f76;
-    --primary:#111111;   /* botón negro */
-    --stitch:#2a2a2a;    /* color fijo de costura (solo display) */
+    --muted:#6c6c6c;
+    --accent:#111111; /* botones negros */
   }
   *{box-sizing:border-box}
-  body{margin:0;background:var(--bg);color:var(--ink);
+  html,body{margin:0;height:100%}
+  body{background:var(--bg);color:var(--ink);
        font:15px/1.5 system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif}
-  .wrap{max-width:1200px;margin:24px auto;padding:0 20px}
-  header{display:flex;align-items:center;justify-content:space-between;margin:4px 0 18px}
+
+  .wrap{max-width:1200px;margin:0 auto;padding:22px 20px 40px}
+  header{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px}
+  .brand{font-weight:700;letter-spacing:.04em}
   .crumbs{color:var(--muted);font-size:13px}
   .crumbs a{color:inherit;text-decoration:none}
-  .brand{font-weight:700;letter-spacing:.02em}
 
-  .product{display:grid;gap:22px;grid-template-columns:1fr 420px}
+  .grid{display:grid;gap:22px;grid-template-columns:1fr 420px}
   .media{background:var(--panel);border:1px solid var(--line);border-radius:14px;
-         padding:14px;display:flex;align-items:center;justify-content:center;min-height:860px}
+         display:flex;align-items:center;justify-content:center;min-height:860px;padding:14px}
   #cv{width:600px;height:800px;background:#fff;border:1px solid var(--line);
-      border-radius:12px;box-shadow:0 1px 0 rgba(0,0,0,.02), 0 12px 30px rgba(0,0,0,.05)}
+      border-radius:12px;box-shadow:0 1px 0 rgba(0,0,0,.02),0 10px 28px rgba(0,0,0,.06)}
 
-  .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;
-        padding:18px;position:sticky;top:18px;align-self:start}
-  h1{font-size:22px;margin:0 0 4px}
-  .sub{color:var(--muted);font-size:13px;margin:0 0 12px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:20px;
+        position:sticky;top:18px;height:fit-content}
+  h1{font-size:22px;margin:0 0 2px}
+  .sub{color:var(--muted);font-size:13px;margin:0 0 14px}
 
-  .row{display:flex;align-items:center;gap:10px;margin:10px 0}
-  .row label{min-width:128px;font-weight:600}
-  select,input[type="color"]{height:38px;border-radius:10px;border:1px solid var(--line);
-                              background:#fff;padding:0 10px;cursor:pointer}
-  input[type="color"]{width:46px;padding:0}
-  .chip{display:inline-flex;align-items:center;gap:8px;padding:7px 10px;border:1px solid var(--line);
+  .row{display:flex;align-items:center;gap:10px;margin:12px 0}
+  .row label{min-width:150px;font-weight:600}
+  select,input[type="color"]{
+    height:40px;border-radius:10px;border:1px solid var(--line);background:#fff;cursor:pointer
+  }
+  select{padding:0 12px}
+  input[type="color"]{width:48px;padding:0}
+  .chip{display:inline-flex;align-items:center;gap:8px;padding:8px 12px;border:1px solid var(--line);
         border-radius:999px;background:#fff;color:var(--muted);font-size:13px}
-  .dot{width:16px;height:16px;border-radius:50%;background:var(--stitch);border:1px solid var(--line)}
+  .dot{width:16px;height:16px;border-radius:50%;background:#2a2a2a;border:1px solid var(--line)}
 
-  .btns{display:flex;gap:10px;margin-top:12px;flex-wrap:wrap}
-  button{cursor:pointer;border-radius:10px;border:1px solid var(--primary);padding:10px 14px;font-weight:700}
-  .primary{background:var(--primary);color:#fff}
-  .ghost{background:#fff;color:var(--primary)}
-  .note{margin-top:8px;color:var(--muted);font-size:12px}
+  .btns{display:flex;gap:10px;margin-top:14px;flex-wrap:wrap}
+  button{cursor:pointer;border-radius:10px;padding:11px 16px;font-weight:700}
+  .primary{background:var(--accent);color:#fff;border:1px solid var(--accent)}
+  .ghost{background:#fff;color:var(--accent);border:1px solid var(--accent)}
+  .note{margin-top:10px;color:var(--muted);font-size:12px}
 
-  /* El wizard necesita el input de costura presente. Lo ocultamos sin romper nada. */
+  /* Accesibilidad: el input de costura queda para el wizard pero oculto */
   .sr-only{position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden}
 
-  @media (max-width:980px){
-    .product{grid-template-columns:1fr}
+  @media (max-width:1020px){
+    .grid{grid-template-columns:1fr}
     .media{min-height:auto}
     #cv{width:100%;height:auto;aspect-ratio:3/4}
+    .card{position:static}
   }
 </style>
 </head>
@@ -68,16 +72,14 @@
       <div class="brand">VALONIA</div>
     </header>
 
-    <div class="product">
-      <!-- Lienzo -->
+    <div class="grid">
       <div class="media">
-        <canvas id="cv" width="600" height="800"></canvas>
+        <canvas id="cv" width="600" height="800" aria-label="Vista previa del bolso"></canvas>
       </div>
 
-      <!-- Opciones -->
-      <aside class="card">
+      <aside class="card" aria-label="Panel de personalización">
         <h1>Tambour</h1>
-        <p class="sub">Personaliza 2 colores / 2 texturas. Contorno y costura fijos.</p>
+        <p class="sub">2 colores · 2 texturas · contorno y costura fijos.</p>
 
         <div class="row">
           <label for="texA">Grupo A · Textura</label>
@@ -97,7 +99,7 @@
           <input id="colB" type="color" value="#c61a1a" title="Color Grupo B">
         </div>
 
-        <!-- Costura fija (solo display). Input oculto para el wizard. -->
+        <!-- Costura solo visual (fija) -->
         <div class="row">
           <label>Costura (C)</label>
           <span class="chip"><span class="dot"></span> fija</span>
@@ -105,17 +107,18 @@
         </div>
 
         <div class="btns">
-          <button id="dl"   class="primary">Descargar preview</button>
+          <button id="dl" class="primary">Descargar preview</button>
           <button id="save" class="ghost">Ver JSON</button>
           <input type="hidden" id="spbc_config_json">
         </div>
-        <p class="note">Texturas simuladas (liso / ante). La vista previa es orientativa.</p>
+        <p class="note">Las texturas (liso/ante) son simuladas para previsualización.</p>
       </aside>
     </div>
   </div>
 
-  <!-- Librería + wizard (no tocamos lógica) -->
+  <!-- Fabric -->
   <script src="https://cdn.jsdelivr.net/npm/fabric@5.3.0/dist/fabric.min.js"></script>
-  <script src="js/customizer.js?v=1"></script>
+  <!-- Tu wizard SIN tocar lógica; solo le subo la versión para evitar caché -->
+  <script src="js/customizer.js?v=4"></script>
 </body>
 </html>
