@@ -1,61 +1,75 @@
 <!doctype html>
 <html lang="es">
 <head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Bag Wizard (2 colores / 2 texturas + costura)</title>
-<style>
-  body{font-family:system-ui,Segoe UI,Roboto,Arial,sans-serif;margin:0;padding:0;background:#f6f7f9;color:#222}
-  .wrap{max-width:1100px;margin:24px auto;padding:0 16px}
-  h1{font-size:22px;margin:0 0 16px}
-  .panel{background:#fff;border-radius:12px;box-shadow:0 6px 18px rgba(0,0,0,.08);padding:16px;display:grid;grid-template-columns:320px 1fr;gap:16px}
-  .controls label{display:flex;align-items:center;gap:8px;margin:10px 0}
-  .controls select,.controls input[type=color]{height:32px;border:1px solid #d2d6db;border-radius:8px;padding:0 8px;background:#fff}
-  .actions{display:flex;gap:8px;margin-top:12px}
-  button{height:34px;border:1px solid #cfd3d8;background:#fff;border-radius:8px;padding:0 12px;cursor:pointer}
-  canvas{background:#fff;border-radius:12px;border:1px solid #e5e8ec}
-  small.mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:#666}
-</style>
-<!-- fabric.js (desde CDN) -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.0/fabric.min.js" integrity="sha512-+U7H5Oq8o8t9F3p2f/6m3i5hE5V1wz4b9oXW0q5i7BfKc2YxgW3I7nA2gboe0vJZ4cF0vLq8sY0b3E7gB1MkNw==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Bag Wizard (2 colores / 2 texturas + costura)</title>
+  <style>
+    :root { --bg:#f7f7f9; --panel:#fff; --line:#e6e6e9; }
+    body{margin:0;background:var(--bg);font:15px/1.4 system-ui,Segoe UI,Roboto,Arial,sans-serif;color:#222;}
+    .wrap{max-width:1100px;margin:24px auto;padding:0 16px;}
+    h1{font-size:20px;margin:0 0 14px;}
+    .box{background:var(--panel);border:1px solid var(--line);border-radius:12px;}
+    .grid{display:grid;grid-template-columns:340px 1fr;gap:16px;}
+    .panel{padding:14px;}
+    .stage{display:flex;align-items:center;justify-content:center;padding:10px;}
+    .stage .box{width:100%;min-height:720px;display:flex;align-items:center;justify-content:center;}
+    label{display:inline-flex;align-items:center;gap:8px;margin:6px 0;}
+    select,input[type="color"],button{margin-left:6px}
+    .row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:6px 0;}
+    button{cursor:pointer;padding:8px 10px;border-radius:8px;border:1px solid var(--line);background:#fff}
+    #cv{border:1px dashed var(--line);background:#fff;border-radius:10px}
+  </style>
 </head>
 <body>
-<div class="wrap">
-  <h1>Bag Wizard <small class="mono">(2 colores / 2 texturas + costura)</small></h1>
-  <div class="panel">
-    <div class="controls">
-      <label>Grupo A · Textura
-        <select id="texA">
-          <option value="smooth">Lisa</option>
-          <option value="suede">Ante</option>
-        </select>
-        <input type="color" id="colA" value="#dddddd" />
-      </label>
-      <label>Grupo B · Textura
-        <select id="texB">
-          <option value="smooth">Lisa</option>
-          <option value="suede">Ante</option>
-        </select>
-        <input type="color" id="colB" value="#c61a1a" />
-      </label>
-      <hr/>
-      <label>Grupo C · Costura (liso)
-        <input type="color" id="stitchColor" value="#2a2a2a" />
-      </label>
+  <div class="wrap">
+    <h1>Bag Wizard (2 colores / 2 texturas + costura)</h1>
 
-      <div class="actions">
-        <button id="dl">Descargar preview</button>
-        <button id="save">Ver JSON</button>
+    <div class="grid">
+      <!-- Controles -->
+      <div class="box panel">
+        <div class="row">
+          <label>Grupo A · Textura
+            <select id="texA">
+              <option value="smooth">Lisa</option>
+              <option value="suede">Ante</option>
+            </select>
+          </label>
+          <input id="colA" type="color" value="#e6e6e6" />
+        </div>
+
+        <div class="row">
+          <label>Grupo B · Textura
+            <select id="texB">
+              <option value="smooth">Lisa</option>
+              <option value="suede">Ante</option>
+            </select>
+          </label>
+          <input id="colB" type="color" value="#c61a1a" />
+        </div>
+
+        <div class="row">
+          <label>Grupo C · Costura (liso)</label>
+          <input id="stitchColor" type="color" value="#2a2a2a" />
+        </div>
+
+        <div class="row">
+          <button id="dl">Descargar preview</button>
+          <button id="save">Ver JSON</button>
+          <input type="hidden" id="spbc_config_json" />
+        </div>
       </div>
-      <input type="hidden" id="spbc_config_json" />
-    </div>
 
-    <div class="stage">
-      <canvas id="cv" width="600" height="800"></canvas>
+      <!-- Lienzo -->
+      <div class="box stage">
+        <canvas id="cv" width="600" height="800"></canvas>
+      </div>
     </div>
   </div>
-</div>
 
-<script src="./js/customizer.js?v=23"></script>
+  <!-- FabricJS desde CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/fabric@5.3.0/dist/fabric.min.js"></script>
+  <!-- Tu lógica (la versión con Grupo C). Ajusta el nombre si lo cambiaste -->
+  <script src="./customizer.js?v=3"></script>
 </body>
 </html>
