@@ -17,17 +17,19 @@
   const canvas=new fabric.Canvas('cv',{selection:false});
   canvas.setWidth(W); canvas.setHeight(H);
 
-  // Debug
+  // Debug overlay
   const dbg=document.createElement('div');
   Object.assign(dbg.style,{position:'fixed',top:'8px',right:'8px',background:'rgba(0,0,0,.85)',color:'#fff',
     padding:'8px 10px',font:'12px/1.35 system-ui,Segoe UI,Roboto,Arial',borderRadius:'10px',zIndex:9999,maxWidth:'48ch'});
   dbg.textContent='Cargando…'; document.body.appendChild(dbg);
 
   let mode=''; // 'ids' | 'auto-mix' | 'auto-geom'
-  let bucketA=[], bucketB=[], outlineObjs=[];
+  let bucketA=[], bucketB=[];
+  let outlineSet=new Set();       // todos los objetos del contorno
+  let outlineGroup=null;          // referencia al grupo outline (si existe)
   let imgSmooth=null, imgSuede=null;
 
-  // ---------- helpers ----------
+  // ---------------- helpers ----------------
   function fit(g){
     const m=24,maxW=W-2*m,maxH=H-2*m;
     const w=g.width||g.getScaledWidth(),h=g.height||g.getScaledHeight();
@@ -38,13 +40,19 @@
   function walk(arr,fn){ (function rec(a){ a.forEach(o=>{ fn(o); if(o._objects&&o._objects.length) rec(o._objects); }); })(arr); }
   function leafs(root){ const out=[]; walk([root], o=>{ if(o._objects&&o._objects.length) return; if(o.type==='image') return; out.push(o); }); return out; }
   function idsMap(arr){ const map={}; walk(arr,o=>{ if(o.id) map[o.id]=o; }); return map; }
+  function bringChildToTop(parent, child){
+    if(!parent || !parent._objects) return;
+    const arr = parent._objects;
+    const idx = arr.indexOf(child);
+    if(idx>=0){ arr.splice(idx,1); arr.push(child); parent.dirty=true; }
+  }
 
   function getW(o){ return typeof o.getScaledWidth==='function'? o.getScaledWidth(): (o.width||0); }
   function getH(o){ return typeof o.getScaledHeight==='function'? o.getScaledHeight(): (o.height||0); }
   function bboxArea(o){ return Math.max(1, getW(o)*getH(o)); }
   function centerX(o){ const r=o.getBoundingRect(true,true); return r.left + r.width/2; }
 
-  // ---------- color ----------
+  // --------------- color utils ---------------
   function parseColor(str){
     if(!str) return null;
     if(typeof str!=='string') return null;
@@ -74,20 +82,15 @@
     const a = c[3]==null?1:c[3];
     return a>0.02;
   }
-  // Outline: sin fill + stroke oscuro y fino
-  function isOutline(o){
+  // Outline heurístico (por si hiciera falta)
+  function isOutlineHeuristic(o){
     const sw=('strokeWidth' in o)?(o.strokeWidth||0):0;
     const sRGB=('stroke' in o)?parseColor(o.stroke):null;
     const dark = sRGB && (luma(sRGB)<80) && nearGray(sRGB,30);
     return !hasVisibleFill(o) && dark && sw<=4;
   }
-  function baseRGB(o){
-    if(hasVisibleFill(o)){
-      const c=parseColor(o.fill); return c? [c[0],c[1],c[2]] : null;
-    }
-    const s=('stroke' in o) ? parseColor(o.stroke) : null;
-    return s? [s[0],s[1],s[2]] : null;
-  }
+
+  // ---------------- clustering ----------------
   function rgb2hsv([r,g,b]){
     r/=255; g/=255; b/=255;
     const max=Math.max(r,g,b), min=Math.min(r,g,b);
@@ -103,19 +106,26 @@
     const v = max;
     return [h,s,v];
   }
+  function baseRGB(o){
+    if(hasVisibleFill(o)){
+      const c=parseColor(o.fill); return c? [c[0],c[1],c[2]] : null;
+    }
+    const s=('stroke' in o) ? parseColor(o.stroke) : null;
+    return s? [s[0],s[1],s[2]] : null;
+  }
   function areaMetric(o){ return hasVisibleFill(o) ? bboxArea(o) : Math.max(1,(o.strokeWidth||1)*5); }
 
-  // ---------- clustering ----------
+  // mezcla HUE + posición X
   function kmeans2_mix(objs){
     if(objs.length<=2) return {A:objs, B:[]};
-
     const weightHue = 1.0, weightPos = 0.6;
+
     const items = objs.map(o=>{
       const rgb = baseRGB(o);
       let hx=0, hy=0;
       if(rgb){
         const [h,s,v]=rgb2hsv(rgb);
-        if(!(s<0.18 || v<0.28)){ // ignora grises/muy oscuros
+        if(!(s<0.18 || v<0.28)){ // ignora grises/oscuros
           const rad=h*Math.PI/180;
           hx = Math.cos(rad)*weightHue;
           hy = Math.sin(rad)*weightHue;
@@ -172,7 +182,7 @@
     return [A,B];
   }
 
-  // texturas
+  // --------------- texturas ---------------
   function loadImg(src){ return new Promise(res=>{ if(!src){res(null);return;} const i=new Image(); i.crossOrigin='anonymous'; i.onload=()=>res(i); i.onerror=()=>res(null); i.src=src; }); }
   function tintPattern(img,hex){
     if(!img) return hex;
@@ -185,60 +195,85 @@
   }
   const applyFill=(o,mat)=>{ if('fill' in o) o.set('fill',mat); else o.fill=mat; };
 
-  // ----- outline: forzar estilo y traer al frente dentro del grupo -----
-  function bringToGroupTop(o){
-    const p=o.group; if(!p||!p._objects) return;
-    const idx=p._objects.indexOf(o);
-    if(idx>=0){ p._objects.splice(idx,1); p._objects.push(o); p.dirty=true; }
-  }
-  function styleOutlines(root){
-    outlineObjs = leafs(root).filter(isOutline);
-    outlineObjs.forEach(o=>{
-      o.set({
-        fill:'none',               // jamás se pinta relleno
-        stroke:'#111',             // negro
-        strokeWidth:1.2,
-        strokeLineCap:'round',
-        strokeLineJoin:'round',
-        strokeUniform:true,
-        opacity:1
+  // --------- OUTLINE: forzar estilo + subir grupo ----------
+  function collectLeafs(root){ const all=[]; walk([root],o=>{ if(o._objects&&o._objects.length) return; all.push(o); }); return all; }
+  function styleOutlineGroup(root, ids){
+    outlineSet=new Set(); outlineGroup=null;
+
+    // localizar grupo por id conocido
+    const g = ids['body_x5F_clip'] || ids['outline'] || ids['outlines'] || null;
+    if(g){
+      outlineGroup=g;
+      const leaves = collectLeafs(g);
+      leaves.forEach(o=>{
+        outlineSet.add(o);
+        o.set({
+          fill:'none',
+          stroke:'#111',
+          strokeWidth:1.4,
+          strokeLineCap:'round',
+          strokeLineJoin:'round',
+          strokeUniform:true,
+          opacity:1
+        });
       });
-      bringToGroupTop(o);
+      // subir grupo dentro del root
+      const parent = g.group || root;
+      bringChildToTop(parent, g);
+    }
+
+    // fallback: además, cazar outlines por heurística y tratarlos igual
+    leafs(root).forEach(o=>{
+      if(outlineSet.has(o)) return;
+      if(isOutlineHeuristic(o)){
+        outlineSet.add(o);
+        o.set({
+          fill:'none',
+          stroke:'#111',
+          strokeWidth:1.4,
+          strokeLineCap:'round',
+          strokeLineJoin:'round',
+          strokeUniform:true,
+          opacity:1
+        });
+        // subir su grupo inmediato
+        if(o.group) bringChildToTop(o.group, o);
+      }
     });
   }
 
-  // buckets
+  // --------- buckets pintables ----------
   function buildBuckets(root){
     const allLeaves = leafs(root);
-    const paintables = allLeaves.filter(o=>!isOutline(o));
+    const paintables = allLeaves.filter(o=>!outlineSet.has(o)); // nunca pintar outline
 
-    // 1) ids
+    // 1) ids -> stripe1 / stripe2
     const ids=idsMap(root._objects?root._objects:[root]);
     if(ids['stripe1'] && ids['stripe2']){
-      const A=leafs(ids['stripe1']).filter(o=>!isOutline(o));
-      const B=leafs(ids['stripe2']).filter(o=>!isOutline(o));
+      const A=leafs(ids['stripe1']).filter(o=>!outlineSet.has(o));
+      const B=leafs(ids['stripe2']).filter(o=>!outlineSet.has(o));
       if(A.length>=5 && B.length>=5){
         bucketA=A; bucketB=B; mode='ids';
-        dbg.innerHTML=`✅ SVG cargado (modo <b>ids</b>) · stripe1: ${A.length} · stripe2: ${B.length}`;
+        dbg.innerHTML=`✅ SVG cargado (modo <b>ids</b>) · stripe1: ${A.length} · stripe2: ${B.length} · outline: ${outlineSet.size}`;
         return;
       }
     }
 
-    // 2) auto-mix
-    const {A,B} = kmeans2_mix(paintables);
-    if(A.length && B.length){
-      bucketA=A; bucketB=B; mode='auto-mix';
-      dbg.innerHTML=`✅ SVG cargado (modo <b>auto-mix</b>) · A: ${A.length} objs · B: ${B.length} objs`;
+    // 2) auto-mix (color + posición)
+    const mix = kmeans2_mix(paintables);
+    if(mix.A.length && mix.B.length){
+      bucketA=mix.A; bucketB=mix.B; mode='auto-mix';
+      dbg.innerHTML=`✅ SVG cargado (modo <b>auto-mix</b>) · A: ${bucketA.length} · B: ${bucketB.length} · outline: ${outlineSet.size}`;
       return;
     }
 
     // 3) auto-geom
     const [AX,BX]=kmeans2X(paintables);
     bucketA=AX; bucketB=BX; mode='auto-geom';
-    dbg.innerHTML=`✅ SVG cargado (modo <b>auto-geom</b>) · A: ${AX.length} objs · B: ${BX.length} objs`;
+    dbg.innerHTML=`✅ SVG cargado (modo <b>auto-geom</b>) · A: ${AX.length} · B: ${BX.length} · outline: ${outlineSet.size}`;
   }
 
-  // pintado
+  // --------------- pintado ---------------
   function paint(){
     const colA=ui.colA.value||'#e6e6e6', colB=ui.colB.value||'#c61a1a';
     const patA=tintPattern(ui.texA.value==='suede'?imgSuede:imgSmooth, colA);
@@ -247,8 +282,12 @@
     bucketA.forEach(o=>{ applyFill(o, patA); o.dirty=true; });
     bucketB.forEach(o=>{ applyFill(o, patB); o.dirty=true; });
 
-    // asegurar outline arriba y con stroke negro
-    outlineObjs.forEach(o=>{ o.set({fill:'none', stroke:'#111'}); bringToGroupTop(o); o.dirty=true; });
+    // asegurar outline arriba y negro
+    outlineSet.forEach(o=>{
+      o.set({fill:'none', stroke:'#111'});
+      if(o.group) bringChildToTop(o.group, o);
+      o.dirty=true;
+    });
 
     canvas.requestRenderAll();
   }
@@ -259,8 +298,9 @@
     const root=fabric.util.groupSVGElements(objs,opts);
     fit(root); canvas.add(root);
 
-    // preparar outline y grupos
-    styleOutlines(root);
+    // ids para localizar outline y después buckets
+    const ids=idsMap(root._objects?root._objects:[root]);
+    styleOutlineGroup(root, ids);
     buildBuckets(root);
     paint();
   },(item,obj)=>{ obj.selectable=false; });
