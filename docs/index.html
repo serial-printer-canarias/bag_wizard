@@ -1,124 +1,101 @@
 <!doctype html>
 <html lang="es">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>VALONIA · Tambour — Personalizador</title>
-<meta name="description" content="Personaliza el bolso Tambour: 2 colores y 2 texturas con previsualización.">
-<style>
-  :root{
-    /* Paleta sobria tipo Valonia */
-    --bg:#f7f7f7;
-    --panel:#ffffff;
-    --line:#e6e6e6;
-    --ink:#111111;
-    --muted:#6c6c6c;
-    --accent:#111111; /* botones negros */
-  }
-  *{box-sizing:border-box}
-  html,body{margin:0;height:100%}
-  body{background:var(--bg);color:var(--ink);
-       font:15px/1.5 system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif}
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Tambour • Valonia (wizard)</title>
+  <style>
+    :root{
+      --bg:#f6f6f6; --card:#ffffff; --ink:#0f0f0f;
+      --muted:#6b7280; --accent:#e11d48; --radius:14px;
+    }
+    html,body{height:100%}
+    body{
+      margin:0; font:16px/1.45 ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Arial;
+      background:var(--bg); color:#111;
+      display:flex; align-items:flex-start; justify-content:center;
+    }
+    .wrap{width:min(1100px,100%); padding:18px}
+    .grid{display:grid; grid-template-columns: 1.4fr 1fr; gap:18px}
+    .card{
+      background:var(--card); border-radius:var(--radius);
+      box-shadow:0 1px 2px rgba(0,0,0,.05), 0 10px 30px rgba(0,0,0,.06);
+      border:1px solid #e5e7eb;
+    }
+    .stage{padding:18px}
+    canvas{width:100%; height:auto; display:block; border-radius:12px}
 
-  .wrap{max-width:1200px;margin:0 auto;padding:22px 20px 40px}
-  header{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px}
-  .brand{font-weight:700;letter-spacing:.04em}
-  .crumbs{color:var(--muted);font-size:13px}
-  .crumbs a{color:inherit;text-decoration:none}
+    .panel{padding:18px}
+    h1{margin:0 0 4px 0; font-size:28px}
+    .sub{color:var(--muted); margin:0 0 18px 0}
 
-  .grid{display:grid;gap:22px;grid-template-columns:1fr 420px}
-  .media{background:var(--panel);border:1px solid var(--line);border-radius:14px;
-         display:flex;align-items:center;justify-content:center;min-height:860px;padding:14px}
-  #cv{width:600px;height:800px;background:#fff;border:1px solid var(--line);
-      border-radius:12px;box-shadow:0 1px 0 rgba(0,0,0,.02),0 10px 28px rgba(0,0,0,.06)}
-
-  .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:20px;
-        position:sticky;top:18px;height:fit-content}
-  h1{font-size:22px;margin:0 0 2px}
-  .sub{color:var(--muted);font-size:13px;margin:0 0 14px}
-
-  .row{display:flex;align-items:center;gap:10px;margin:12px 0}
-  .row label{min-width:150px;font-weight:600}
-  select,input[type="color"]{
-    height:40px;border-radius:10px;border:1px solid var(--line);background:#fff;cursor:pointer
-  }
-  select{padding:0 12px}
-  input[type="color"]{width:48px;padding:0}
-  .chip{display:inline-flex;align-items:center;gap:8px;padding:8px 12px;border:1px solid var(--line);
-        border-radius:999px;background:#fff;color:var(--muted);font-size:13px}
-  .dot{width:16px;height:16px;border-radius:50%;background:#2a2a2a;border:1px solid var(--line)}
-
-  .btns{display:flex;gap:10px;margin-top:14px;flex-wrap:wrap}
-  button{cursor:pointer;border-radius:10px;padding:11px 16px;font-weight:700}
-  .primary{background:var(--accent);color:#fff;border:1px solid var(--accent)}
-  .ghost{background:#fff;color:var(--accent);border:1px solid var(--accent)}
-  .note{margin-top:10px;color:var(--muted);font-size:12px}
-
-  /* Accesibilidad: el input de costura queda para el wizard pero oculto */
-  .sr-only{position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden}
-
-  @media (max-width:1020px){
-    .grid{grid-template-columns:1fr}
-    .media{min-height:auto}
-    #cv{width:100%;height:auto;aspect-ratio:3/4}
-    .card{position:static}
-  }
-</style>
+    .row{display:flex; align-items:center; justify-content:space-between; gap:10px; margin:12px 0}
+    .lbl{font-weight:600}
+    select{
+      appearance:none; border:1px solid #e5e7eb; border-radius:12px;
+      padding:8px 30px 8px 12px; background:#fff; font-weight:600;
+    }
+    .color{
+      width:48px; height:36px; border-radius:10px; border:1px solid #e5e7eb; padding:0;
+      appearance:none; background:#fff; cursor:pointer;
+    }
+    .btn{
+      display:inline-flex; align-items:center; gap:8px;
+      padding:10px 14px; border-radius:12px; border:1px solid #e5e7eb; background:#fff;
+      font-weight:700; cursor:pointer;
+    }
+    .btn.primary{ background:#111; color:#fff; border-color:#111 }
+    .muted{color:var(--muted); font-size:14px}
+  </style>
 </head>
 <body>
   <div class="wrap">
-    <header>
-      <div class="crumbs"><a href="#">Inicio</a> / <a href="#">Bolsos</a> / Tambour</div>
-      <div class="brand">VALONIA</div>
-    </header>
-
     <div class="grid">
-      <div class="media">
-        <canvas id="cv" width="600" height="800" aria-label="Vista previa del bolso"></canvas>
+      <!-- Lienzo -->
+      <div class="card stage">
+        <canvas id="cv" width="800" height="900" aria-label="Vista previa del bolso"></canvas>
       </div>
 
-      <aside class="card" aria-label="Panel de personalización">
+      <!-- Panel -->
+      <div class="card panel">
         <h1>Tambour</h1>
-        <p class="sub">2 colores · 2 texturas · contorno y costura fijos.</p>
+        <p class="sub">2 colores · 2 texturas · contorno fijo.</p>
 
+        <!-- Grupo A -->
         <div class="row">
-          <label for="texA">Grupo A · Textura</label>
-          <select id="texA">
-            <option value="smooth">Lisa</option>
-            <option value="suede">Ante</option>
-          </select>
-          <input id="colA" type="color" value="#e6e6e6" title="Color Grupo A">
+          <div class="lbl">Grupo A · Textura</div>
+          <div style="display:flex;gap:10px;align-items:center">
+            <select id="texA" aria-label="Textura grupo A">
+              <option value="smooth" selected>Lisa</option>
+              <option value="suede">Ante</option>
+            </select>
+            <input id="colA" class="color" type="color" value="#d9d9d9" aria-label="Color grupo A" />
+          </div>
         </div>
 
+        <!-- Grupo B -->
         <div class="row">
-          <label for="texB">Grupo B · Textura</label>
-          <select id="texB">
-            <option value="smooth">Lisa</option>
-            <option value="suede">Ante</option>
-          </select>
-          <input id="colB" type="color" value="#c61a1a" title="Color Grupo B">
+          <div class="lbl">Grupo B · Textura</div>
+          <div style="display:flex;gap:10px;align-items:center">
+            <select id="texB" aria-label="Textura grupo B">
+              <option value="smooth" selected>Lisa</option>
+              <option value="suede">Ante</option>
+            </select>
+            <input id="colB" class="color" type="color" value="#c61a1a" aria-label="Color grupo B" />
+          </div>
         </div>
 
-        <!-- Costura solo visual (fija) -->
-        <div class="row">
-          <label>Costura (C)</label>
-          <span class="chip"><span class="dot"></span> fija</span>
-          <input id="stitchColor" class="sr-only" type="color" value="#2a2a2a" aria-hidden="true">
+        <div class="row" style="margin-top:18px">
+          <button id="dl" class="btn">Descargar preview</button>
+          <span class="muted">Pista: pulsa <b>D</b> para ver/ocultar debug.</span>
         </div>
-
-        <div class="btns">
-          <button id="dl" class="primary">Descargar preview</button>
-          <button id="save" class="ghost">Ver JSON</button>
-          <input type="hidden" id="spbc_config_json">
-        </div>
-        <p class="note">Las texturas (liso/ante) son simuladas para previsualización.</p>
-      </aside>
+      </div>
     </div>
   </div>
 
-  <!-- Fabric -->
+  <!-- FabricJS -->
   <script src="https://cdn.jsdelivr.net/npm/fabric@5.3.0/dist/fabric.min.js"></script>
-  <!-- Tu wizard SIN tocar lógica; solo le subo la versión para evitar caché -->
-  <script src="js/customizer.js?v=4"></script>
+  <!-- Lógica del wizard -->
+  <script src="./customizer.js"></script>
 </body>
 </html>
