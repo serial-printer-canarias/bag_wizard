@@ -48,6 +48,7 @@
   }
   .panel{grid-area:controls}
   .stage{grid-area:stage}
+
   @media (max-width:980px){
     .grid{grid-template-columns:1fr; grid-template-areas:"stage" "controls"}
   }
@@ -89,17 +90,17 @@
   /* Canvas: SIEMPRE proporcional (600x800) */
   #cv{
     background:#fff; border-radius:14px; border:1px solid var(--line);
-    display:block; margin:0 auto;              /* centrado */
-    width:auto; height:auto;                    /* no forzamos dimensiones */
-    max-width: clamp(260px, 40vw, 420px);       /* desktop */
-    /* la altura resultante será 4/3 del ancho (ratio nativo del canvas) */
+    display:block; margin:0 auto;            /* centrado */
+    width:auto; height:auto;                  /* no forzamos dimensiones */
+    max-width: clamp(260px, 40vw, 420px);     /* desktop */
+    /* la altura resultante será 4/3 del ancho por la ratio nativa */
   }
-  /* Móvil: calculamos un ancho que garantice ver todo sin deformar */
+  /* 📱 Móvil: limitamos el LARGO y calculamos el ancho con 3:4 */
   @media (max-width:980px){
     #cv{
-      width: min(92vw, calc(56vh * 0.75));     /* 0.75 = 3/4 (ratio 3:4) */
-      height:auto;                              /* mantiene proporción */
-      max-width:92vw;
+      width: min(84vw, calc(48vh * 0.75));   /* 0.75 = 3/4 → respeta proporción */
+      height: auto;                           /* mantiene 600x800 */
+      max-width: 84vw;
     }
   }
 </style>
