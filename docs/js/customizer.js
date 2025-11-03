@@ -13,8 +13,8 @@
     padding:'8px 10px',font:'12px/1.35 system-ui,Segoe UI,Roboto,Arial',borderRadius:'10px',zIndex:9999,maxWidth:'48ch'});
   dbg.textContent='Cargando…'; document.body.appendChild(dbg);
 
-  let buckets=[[],[]]; // [A,B]
-  let root=null;
+  let mode='';          // 'ids' | 'auto'
+  let groupA=[], groupB=[]; // arrays de objetos a pintar
 
   function fit(g){
     const m=24,maxW=W-2*m,maxH=H-2*m;
@@ -24,73 +24,94 @@
     g.set({left:(W-w*s)/2,top:(H-h*s)/2,selectable:false,evented:false});
   }
 
-  function leaves(objs){
+  function walkLeaves(objs){
     const out=[];
-    (function walk(arr){
+    (function rec(arr){
       arr.forEach(o=>{
-        if(o._objects&&o._objects.length){ walk(o._objects); }
+        if(o._objects&&o._objects.length) rec(o._objects);
         else out.push(o);
       });
     })(objs);
     return out;
   }
 
-  function normalizeColor(c){
-    if(!c) return null;
-    const ctx=document.createElement('canvas').getContext('2d');
-    ctx.fillStyle=c; return ctx.fillStyle; // devuelve rgb(r,g,b)
+  function mapById(objs){
+    const map={};
+    (function rec(arr){
+      arr.forEach(o=>{
+        if(o.id) map[o.id]=o;
+        if(o._objects&&o._objects.length) rec(o._objects);
+      });
+    })(objs);
+    return map;
   }
 
-  function hashColor(rgb){ // agrupa por color aproximado (tolerancia 16)
+  function normColor(c){
+    if(!c) return null;
+    const ctx=document.createElement('canvas').getContext('2d');
+    ctx.fillStyle=c; return ctx.fillStyle; // rgb(r,g,b)
+  }
+  function bucketKey(rgb){
     if(!rgb) return null;
     const m=rgb.match(/\d+/g); if(!m) return null;
     const [r,g,b]=m.map(n=>parseInt(n,10));
-    const q=(v)=>Math.round(v/16)*16; // cuantiza
+    const q=v=>Math.round(v/16)*16; // tolerancia
     return `rgb(${q(r)}, ${q(g)}, ${q(b)})`;
   }
 
-  function buildBuckets(group){
-    const all=leaves(group._objects?group._objects:[group]);
-
-    // Mapa de color -> objetos (usamos fill si existe, si no stroke)
+  function pickBucketsAuto(root){
+    const leaves=walkLeaves(root._objects?root._objects:[root]);
     const map=new Map();
-    all.forEach(o=>{
-      const base = ('fill' in o && o.fill) ? o.fill : (('stroke' in o && o.stroke) ? o.stroke : null);
-      const norm = normalizeColor(base);
-      const key = hashColor(norm);
+    leaves.forEach(o=>{
+      const base=('fill' in o && o.fill)? o.fill : (('stroke' in o && o.stroke)? o.stroke : null);
+      const key=bucketKey(normColor(base));
       if(!key) return;
-      if(!map.has(key)) map.set(key, []);
+      if(!map.has(key)) map.set(key,[]);
       map.get(key).push(o);
     });
+    const top=[...map.entries()].sort((a,b)=>b[1].length-a[1].length).slice(0,2);
+    groupA = top[0]? top[0][1] : [];
+    groupB = top[1]? top[1][1] : [];
+    const info = top.map(([k,v],i)=>`#${i+1} ${k} → ${v.length} objs`).join('<br>');
+    dbg.innerHTML=`✅ SVG cargado (modo <b>auto</b>)<br>${info||'No se detectaron colores'}`;
+    mode='auto';
+  }
 
-    // Coge los 2 colores con más objetos
-    const colors=[...map.entries()].sort((a,b)=>b[1].length-a[1].length).slice(0,2);
-    buckets=[ colors[0]?colors[0][1]:[], colors[1]?colors[1][1]:[] ];
-
-    const info = colors.map(([k,v],i)=>`#${i+1} ${k} → ${v.length} objs`).join('<br>');
-    dbg.innerHTML = `✅ SVG cargado<br>${info || 'No se detectaron colores'}<br><small>Estos dos “grupos” son los que pintarán Color A y B.</small>`;
+  function pickBucketsById(root){
+    const ids=mapById(root._objects?root._objects:[root]);
+    if(ids['stripe1'] && ids['stripe2']){
+      // aplanamos a hojas
+      groupA=walkLeaves([ids['stripe1']]);
+      groupB=walkLeaves([ids['stripe2']]);
+      dbg.innerHTML=`✅ SVG cargado (modo <b>ids</b>)<br>stripe1: ${groupA.length} objs<br>stripe2: ${groupB.length} objs`;
+      mode='ids';
+      return true;
+    }
+    return false;
   }
 
   function paint(){
-    // Aplica color SOLIDO a ambos buckets (fill y stroke)
     const colA=ui.colA.value||'#e6e6e6', colB=ui.colB.value||'#c61a1a';
-    const paintSet=(set,color)=>{
-      set.forEach(o=>{
+    const paintSet=(arr,color)=>{
+      arr.forEach(o=>{
         if('fill' in o && o.type!=='image') o.set('fill', color);
         if('stroke' in o) o.set('stroke', color);
         o.opacity=1;
       });
     };
-    paintSet(buckets[0], colA);
-    paintSet(buckets[1], colB);
+    paintSet(groupA,colA);
+    paintSet(groupB,colB);
     canvas.requestRenderAll();
   }
 
   fabric.loadSVGFromURL(SVG,(objs,opts)=>{
-    root=fabric.util.groupSVGElements(objs,opts);
+    const root=fabric.util.groupSVGElements(objs,opts);
     fit(root); canvas.add(root);
-    buildBuckets(root);
-    paint(); // pinta al cargar
+
+    // 1) intenta por ids; 2) si no, agrupa por color automáticamente
+    if (!pickBucketsById(root)) pickBucketsAuto(root);
+
+    paint();
   },(item,obj)=>{ obj.selectable=false; });
 
   ['change','input'].forEach(ev=>{
@@ -106,7 +127,10 @@
   ui.save.addEventListener('click', ()=>{
     ui.hidden.value=JSON.stringify({
       model:'bucket-01',
-      A:{color:ui.colA.value}, B:{color:ui.colB.value}, version:'1.0.0'
+      mode,
+      A:{color:ui.colA.value},
+      B:{color:ui.colB.value},
+      version:'1.0.0'
     });
     alert(ui.hidden.value);
   });
