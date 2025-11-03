@@ -64,19 +64,18 @@
     </div>
   </div>
 
-  <!-- FabricJS -->
   <script src="https://cdn.jsdelivr.net/npm/fabric@5.3.0/dist/fabric.min.js"></script>
-
   <script>
   (function(){
-    // ====== CONFIG ======
-    const SVG = 'assets/svg/bag_base.svg';      // Asegúrate que exista y se llame así
+    // -------- CONFIG --------
+    const SVG = 'assets/svg/bag_base.svg';
     const TX  = {
       smooth: 'assets/textures/leather_smooth.jpg',
       suede:  'assets/textures/leather_suede.jpg',
     };
+    const THRESH_MIN_IDS = 8; // si stripe1/2 traen menos de esto, caemos a auto-mix
 
-    // ====== UI ======
+    // -------- UI --------
     const $ = (s,c=document)=>c.querySelector(s);
     const ui = {
       texA:$('#texA'), colA:$('#colA'),
@@ -85,7 +84,7 @@
       dl:$('#dl'), save:$('#save'), hidden:$('#spbc_config_json')
     };
 
-    // ====== Canvas ======
+    // -------- Canvas --------
     const W=600,H=800;
     const canvas=new fabric.Canvas('cv',{selection:false});
     canvas.setWidth(W); canvas.setHeight(H);
@@ -97,43 +96,17 @@
     dbg.textContent='Cargando…'; document.body.appendChild(dbg);
     const say=(t)=>dbg.innerHTML=t;
 
-    // Captura errores JS
-    window.addEventListener('error', e=>{ say('❌ Error JS: '+e.message); });
-
-    // ====== helpers ======
-    const getW=o=>typeof o.getScaledWidth==='function'?o.getScaledWidth():(o.width||0);
-    const getH=o=>typeof o.getScaledHeight==='function'?o.getScaledHeight():(o.height||0);
-    const bboxArea=o=>Math.max(1,getW(o)*getH(o));
-    const hasFill=o=>('fill' in o && o.fill && o.fill!=='none');
-    const hasStroke=o=>('stroke' in o && o.stroke && o.stroke!=='none');
-    const parseColor=(s)=>{
-      if(!s||typeof s!=='string') return null;
-      if(s==='none'||s.startsWith('url(')) return null;
-      if(s[0]==='#'){
-        const h=s.slice(1); const to=(x)=>parseInt(x,16);
-        if(h.length===3){const r=to(h[0]+h[0]),g=to(h[1]+h[1]),b=to(h[2]+h[2]);return [r,g,b,1];}
-        if(h.length>=6){return [to(h.slice(0,2)),to(h.slice(2,4)),to(h.slice(4,6)),1];}
-        return null;
-      }
-      const m=s.match(/rgba?\((\d+)[,\s]+(\d+)[,\s]+(\d+)(?:[,\s/]+([\d.]+))?\)/);
-      return m?[+m[1],+m[2],+m[3], m[4]!=null?+m[4]:1]:null;
-    };
-    const luma=([r,g,b])=>0.2126*r+0.7152*g+0.0722*b;
-    const nearGray=(rgb,t=24)=>Math.abs(rgb[0]-rgb[1])<t && Math.abs(rgb[0]-rgb[2])<t && Math.abs(rgb[1]-rgb[2])<t;
-
-    const fit=(g)=>{
-      const m=24,maxW=W-2*m,maxH=H-2*m;
-      const w=g.width||g.getScaledWidth(),h=g.height||g.getScaledHeight();
-      const s=Math.min(maxW/w,maxH/h);
-      g.scale(s);
-      g.set({left:(W-w*s)/2,top:(H-h*s)/2,selectable:false,evented:false});
-    };
+    // helpers
+    const fit=(g)=>{ const m=24,maxW=W-2*m,maxH=H-2*m; const w=g.width||g.getScaledWidth(),h=g.height||g.getScaledHeight();
+      const s=Math.min(maxW/w,maxH/h); g.scale(s); g.set({left:(W-w*s)/2,top:(H-h*s)/2,selectable:false,evented:false}); };
     const walk=(arr,fn)=>{ (function rec(a){ a.forEach(o=>{ fn(o); if(o._objects&&o._objects.length) rec(o._objects); }); })(arr); };
     const leafs=(root)=>{ const out=[]; walk([root],o=>{ if(o._objects&&o._objects.length) return; if(o.type==='image') return; out.push(o); }); return out; };
     const byId=(root)=>{ const map={}; walk([root], o=>{ if(o.id) map[o.id]=o; }); return map; };
     const bringChildToTop=(parent,child)=>{ if(!parent||!parent._objects) return; const a=parent._objects,i=a.indexOf(child); if(i>=0){a.splice(i,1);a.push(child);parent.dirty=true;} };
+    const hasFill=o=>('fill' in o && o.fill && o.fill!=='none');
+    const hasStroke=o=>('stroke' in o && o.stroke && o.stroke!=='none');
 
-    // ====== texturas ======
+    // texturas
     function loadImg(src){ return new Promise(res=>{ if(!src){res(null);return;} const i=new Image(); i.crossOrigin='anonymous'; i.onload=()=>res(i); i.onerror=()=>res(null); i.src=src; }); }
     function tintPattern(img,hex){
       if(!img) return hex||'#ffffff';
@@ -149,78 +122,74 @@
     let imgSmooth=null, imgSuede=null;
     Promise.all([loadImg(TX.smooth), loadImg(TX.suede)]).then(([a,b])=>{ imgSmooth=a; imgSuede=b; });
 
-    // ====== buckets ======
-    let bucketA=[], bucketB=[], stitchSet=new Set(), outlineSet=new Set(), mode='';
+    // buckets y sets
+    let bucketA=[], bucketB=[], outlineSet=new Set(), stitchSet=new Set(), mode='ids';
+    let rootGroup=null;
 
-    function detectOutlineAndStitch(root){
+    // SOLO detectamos contorno/costura por ID (nada de heurísticas agresivas)
+    function detectOutlineAndStitchById(root){
       outlineSet=new Set(); stitchSet=new Set();
-      const ids = byId(root);
-      // 1) outline por id conocido
+      const ids=byId(root);
+
       const gOutline = ids['body_x5F_clip'] || ids['outline'] || ids['outlines'] || null;
       if(gOutline){
-        const leaves=[]; walk([gOutline],o=>{ if(o._objects&&o._objects.length) return; leaves.push(o); });
+        const leaves=[]; walk([gOutline], o=>{ if(o._objects&&o._objects.length) return; leaves.push(o); });
         leaves.forEach(o=>{
           outlineSet.add(o);
-          // si parece puntada (stroke fino claro), marcamos como stitch
-          const sw=('strokeWidth'in o)?(o.strokeWidth||0):0;
-          const sRGB=parseColor(o.stroke||'');
-          if(sw>0 && sRGB && luma(sRGB)>120) stitchSet.add(o);
+          // estilo negro por defecto
+          if(hasStroke(o) && !hasFill(o)){
+            o.set({fill:'none', stroke:'#111', strokeWidth:1.4, strokeLineCap:'round', strokeLineJoin:'round', strokeUniform:true, opacity:1});
+          }else{
+            o.set({fill:'#111', stroke:null, strokeWidth:0, opacity:1});
+          }
+          if(o.group) bringChildToTop(o.group,o);
+          o.dirty=true;
         });
         const parent=gOutline.group||root; bringChildToTop(parent,gOutline);
       }
-      // 2) heurística; puntadas = stroke fino claro; contorno = stroke fino oscuro o fill gris oscuro pequeño
-      const leavesAll=leafs(root);
-      const areaRoot=(root.getScaledWidth?.()||getW(root))*(root.getScaledHeight?.()||getH(root))||W*H;
-      leavesAll.forEach(o=>{
-        if(o.type==='image') return;
-        const sw=('strokeWidth'in o)?(o.strokeWidth||0):0;
-        const sRGB=parseColor(o.stroke||''); const fRGB=parseColor(o.fill||'');
-        if(sw>0 && sRGB){
-          if(luma(sRGB)>150 && sw<=2.2){ stitchSet.add(o); return; }
-          if(luma(sRGB)<90 && sw<=4){ outlineSet.add(o); return; }
-        }
-        if(hasFill(o) && fRGB && nearGray(fRGB,28) && luma(fRGB)<90 && bboxArea(o)<=areaRoot*0.02){
-          outlineSet.add(o);
-        }
-      });
+
+      const gStitch = ids['stitch'] || ids['seam'] || null;
+      if(gStitch){
+        const leaves=[]; walk([gStitch], o=>{ if(o._objects&&o._objects.length) return; leaves.push(o); });
+        leaves.forEach(o=>{ stitchSet.add(o); });
+        const parent=gStitch.group||root; bringChildToTop(parent,gStitch);
+      }
     }
 
     function buildBuckets(root){
       const ids = byId(root);
-      const all = leafs(root).filter(o=>!outlineSet.has(o) && !stitchSet.has(o));
+      const allLeaves = leafs(root).filter(o=>!outlineSet.has(o) && !stitchSet.has(o));
 
-      // ids explícitos
-      if(ids['stripe1'] && ids['stripe2']){
+      const hasIds = ids['stripe1'] && ids['stripe2'];
+      if(hasIds){
         const A=leafs(ids['stripe1']).filter(o=>!outlineSet.has(o)&&!stitchSet.has(o));
         const B=leafs(ids['stripe2']).filter(o=>!outlineSet.has(o)&&!stitchSet.has(o));
-        if(A.length && B.length){ bucketA=A; bucketB=B; mode='ids'; return; }
+        if(A.length>=THRESH_MIN_IDS && B.length>=THRESH_MIN_IDS){
+          bucketA=A; bucketB=B; mode='ids'; return;
+        }
       }
-      // fallback: dividir por X
+      // Fallback: auto-mix por posición X (simple, robusto)
       const cx=(o)=>{ const r=o.getBoundingRect(true,true); return r.left+r.width/2; };
-      const xs=all.map(cx); const min=Math.min(...xs), max=Math.max(...xs);
-      const mid=(min+max)/2;
-      bucketA=all.filter(o=>cx(o)<=mid); bucketB=all.filter(o=>cx(o)>mid); mode='auto-geom';
+      const xs=allLeaves.map(cx); if(!xs.length){ bucketA=[]; bucketB=[]; mode='vacio'; return; }
+      const min=Math.min(...xs), max=Math.max(...xs), mid=(min+max)/2;
+      bucketA=allLeaves.filter(o=>cx(o)<=mid);
+      bucketB=allLeaves.filter(o=>cx(o)>mid);
+      mode = hasIds ? 'fallback-geom' : 'auto-geom';
     }
 
-    function styleOutlineAndStitch(root){
-      // outline: negro
+    function restyleOutlineAndStitch(){
+      // outline ya negro; solo re-aseguramos
       outlineSet.forEach(o=>{
-        if(hasStroke(o) && !hasFill(o)){
-          o.set({fill:'none',stroke:'#111',strokeWidth:1.4,strokeLineCap:'round',strokeLineJoin:'round',strokeUniform:true,opacity:1});
-        }else{
-          o.set({fill:'#111',stroke:null,strokeWidth:0,opacity:1});
-        }
+        if(hasStroke(o) && !hasFill(o)){ o.set({fill:'none', stroke:'#111'}); }
+        else { o.set({fill:'#111', stroke:null, strokeWidth:0}); }
         if(o.group) bringChildToTop(o.group,o);
         o.dirty=true;
       });
-      // stitch: color variable (pero sin textura)
+      // costura al color elegido
       const color = ui.stitch.value || '#2a2a2a';
       stitchSet.forEach(o=>{
-        if(hasStroke(o)){
-          o.set({stroke:color, strokeUniform:true, opacity:1});
-        }else{
-          o.set({fill:color, opacity:1});
-        }
+        if(hasStroke(o)){ o.set({stroke:color, strokeUniform:true, opacity:1}); }
+        else { o.set({fill:color, opacity:1}); }
         if(o.group) bringChildToTop(o.group,o);
         o.dirty=true;
       });
@@ -234,35 +203,30 @@
 
       bucketA.forEach(o=>{ applyFill(o,matA); o.dirty=true; });
       bucketB.forEach(o=>{ applyFill(o,matB); o.dirty=true; });
-      styleOutlineAndStitch(rootGroup);
+      restyleOutlineAndStitch();
       canvas.requestRenderAll();
     }
 
-    let rootGroup=null;
-
-    // Carga SVG (con mensajes claros si falla)
+    // Carga robusta del SVG
     fabric.util.request(SVG, {
       method: 'GET',
       onComplete: function(xhr){
         if(xhr.status!==200){ say('❌ No se pudo cargar <b>'+SVG+'</b> (HTTP '+xhr.status+'). Revisa ruta/nombre.'); return; }
-        // Carga real con fabric
         fabric.loadSVGFromString(xhr.responseText, (objs, opts)=>{
           if(!objs || !objs.length){ say('❌ SVG sin objetos. Abre '+SVG+' y verifica contenido.'); return; }
           rootGroup = fabric.util.groupSVGElements(objs, opts);
           fit(rootGroup); canvas.add(rootGroup);
 
-          detectOutlineAndStitch(rootGroup);
+          detectOutlineAndStitchById(rootGroup); // SOLO por id
           buildBuckets(rootGroup);
-          styleOutlineAndStitch(rootGroup);
           paint();
 
-          // resumen
-          say('✅ SVG cargado ('+mode+') · A:'+bucketA.length+' · B:'+bucketB.length+' · outline:'+outlineSet.size+' · stitch:'+stitchSet.size);
+          say(`✅ SVG cargado (${mode}) · A:${bucketA.length} · B:${bucketB.length} · outline:${outlineSet.size} · stitch:${stitchSet.size}`);
         }, (item, obj)=>{ obj.selectable=false; });
       }
     });
 
-    // Eventos UI
+    // UI
     ['change','input'].forEach(ev=>{
       ui.colA.addEventListener(ev, paint);
       ui.colB.addEventListener(ev, paint);
@@ -281,7 +245,7 @@
         A:{ texture: ui.texA.value, color: ui.colA.value },
         B:{ texture: ui.texB.value, color: ui.colB.value },
         C:{ stitch: ui.stitch.value },
-        version:'1.1.0'
+        version:'1.1.1'
       });
       alert(ui.hidden.value);
     });
