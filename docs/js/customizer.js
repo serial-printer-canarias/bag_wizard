@@ -336,4 +336,18 @@
       alert(ui.hidden.value);
     });
   }
+  
+    // --- Exponer snapshot para el formulario (no altera la lógica) ---
+  window.getWizardSnapshot = function(){
+    const cfg = {
+      model:'bucket-01',
+      mode,
+      A:{ texture: ui.texA.value, color: ui.colA.value },
+      B:{ texture: ui.texB.value, color: ui.colB.value },
+      C:{ texture:'none', color: ui.stitch ? ui.stitch.value : '#111111' },
+      version:'1.0.1'
+    };
+    const png = canvas.toDataURL({ format:'png', multiplier: 1.5 });
+    return { png, config: cfg };
+  };
 })();
