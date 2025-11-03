@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <title>Bag Wizard (2 colores / 2 texturas + costura)</title>
 
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;600&family=Inter:wght@400;600&display=swap" rel="stylesheet">
@@ -18,28 +18,29 @@
   }
 
   *{box-sizing:border-box}
-  html,body{height:100%}
+  /* ✅ Permite scroll en iOS y evita layouts “encajonados” */
+  html,body{min-height:100%; height:auto}
   body{
     margin:0; background:var(--bg); color:var(--ink);
     font:400 15px/1.55 Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
     -webkit-font-smoothing:antialiased; text-rendering:optimizeLegibility;
+    overflow-y:auto; -webkit-overflow-scrolling:touch;
   }
 
   .wrap{max-width:1200px;margin:0 auto;padding:clamp(10px,3vw,20px)}
 
-  /* --- Header de marca --- */
+  /* --- Header / Logo --- */
   .brand{display:flex;justify-content:center;align-items:center;margin:6px 0 6px}
   .logo-valonia{height:40px;display:block}
   .logo-valonia *{vector-effect:non-scaling-stroke}
 
-  /* Título fino terracota */
   h1{
     margin:6px 0 12px;
     font:300 clamp(22px,3.6vw,36px)/1.1 "Cormorant Garamond", serif;
     color:var(--terracotta); text-align:center; letter-spacing:.2px;
   }
 
-  /* --- Layout minimal --- */
+  /* --- Layout --- */
   .grid{
     display:grid; gap:12px;
     grid-template-columns:320px 1fr;
@@ -49,36 +50,37 @@
   .stage{grid-area:stage}
 
   @media (max-width:980px){
-    .grid{grid-template-columns:1fr; grid-template-areas:"stage" "controls"}
+    .grid{
+      grid-template-columns:1fr;
+      grid-template-areas:"stage" "controls";
+    }
   }
 
-  /* Tarjetas sin fondos ni sombras */
+  /* Tarjetas minimal sin fondos/ sombras */
   .box{background:transparent;border:0;border-radius:var(--r-lg);box-shadow:none}
   .panel{padding:10px}
   .stage{display:flex;align-items:center;justify-content:center;padding:6px}
 
-  /* Controles sobrios */
+  /* Controles */
   .row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:10px 0}
   label{display:inline-flex;align-items:center;gap:10px}
   label span, label{
     font:600 12px/1 Inter, sans-serif;
     text-transform:uppercase; letter-spacing:.3px; color:var(--terracotta);
   }
-
   select, input[type="text"], input[type="number"]{
     width:100%; border:1px solid var(--line); border-radius:var(--r-md);
     padding:9px 11px; background:#fff; outline:none;
   }
   select:focus, input:focus{border-color:var(--terracotta); box-shadow:0 0 0 3px rgba(138,90,68,.12)}
 
-  /* Color pickers redondeados */
   input[type="color"]{
     appearance:none; border:none; width:34px; height:34px; padding:0;
     border-radius:12px; overflow:hidden; background:none;
     box-shadow:inset 0 0 0 1px rgba(0,0,0,.08); cursor:pointer;
   }
 
-  /* Botones rosa pastel */
+  /* Botones */
   button{
     cursor:pointer; padding:10px 16px; border-radius:12px;
     border:1px solid var(--line); background:#fff;
@@ -88,25 +90,25 @@
   #dl{ background:var(--pink); border-color:transparent; color:var(--terracotta) }
   button:hover{transform:translateY(-1px)}
 
-  /* --- Canvas más pequeño, sin romper proporción --- */
+  /* ✅ Canvas: sin deformación (solo escalamos el ancho) */
   #cv{
     background:#fff; border-radius:14px; border:1px solid var(--line);
-    width: clamp(260px, 42vw, 440px);  /* desktop compacto */
-    height: auto; aspect-ratio: 3 / 4;
+    width: clamp(260px, 40vw, 420px);   /* desktop compacto */
+    height:auto;                        /* mantiene 600x800 de forma proporcional */
+    display:block;
   }
-  /* En móvil: que todo quepa en una vista */
+  /* 📱 En móvil: más pequeño para que quepa con los botones */
   @media (max-width:980px){
-    #cv{ width: min(88vw, 340px); max-height: 64vh }
+    #cv{ width: min(88vw, 300px) }   /* sin aspect-ratio ni height fija => no se deforma */
   }
 </style>
 </head>
 <body>
   <div class="wrap">
-    <!-- LOGO inline: pega aquí dentro el contenido de tu logo-valonia.svg -->
+    <!-- Logo inline: pega aquí tu SVG real si quieres -->
     <div class="brand">
       <svg class="logo-valonia" viewBox="0 0 200 40" xmlns="http://www.w3.org/2000/svg" aria-label="Valonia" fill="none" stroke="currentColor" stroke-width="1.2" style="color:#8A5A44">
-        <!-- ⬇️ Sustituye TODO el contenido por el de tu archivo SVG real.
-             Mantén el atributo style="color:#8A5A44" para heredar el tono terracota. -->
+        <!-- Sustituye por el contenido de logo-valonia.svg si lo tienes -->
         <text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" font-family="Cormorant Garamond, serif" font-size="16" fill="#8A5A44">VALONIA</text>
       </svg>
     </div>
@@ -151,6 +153,7 @@
       </div>
 
       <div class="box stage">
+        <!-- Importante: mantenemos el tamaño lógico 600x800 (no tocar atributos) -->
         <canvas id="cv" width="600" height="800"></canvas>
       </div>
     </div>
