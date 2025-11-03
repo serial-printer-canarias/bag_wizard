@@ -2,9 +2,10 @@
   // --- Config ---
   const ROOT = './';
   const SVG  = ROOT + 'assets/svg/bag_base.svg';
+  // Texturas opcionales (si no hay archivos, usar color sólido igualmente):
   const TX = {
-    smooth: ROOT + 'assets/textures/leather_smooth.jpg', // opcional
-    suede:  ROOT + 'assets/textures/leather_suede.jpg',  // opcional
+    smooth: ROOT + 'assets/textures/leather_smooth.jpg',
+    suede:  ROOT + 'assets/textures/leather_suede.jpg',
   };
 
   // --- UI ---
@@ -20,7 +21,7 @@
   const canvas = new fabric.Canvas('cv', { selection:false });
   canvas.setWidth(W); canvas.setHeight(H);
 
-  // --- Overlay debug ---
+  // --- Debug overlay ---
   const dbg=document.createElement('div');
   Object.assign(dbg.style,{position:'fixed',top:'8px',right:'8px',background:'rgba(0,0,0,.8)',color:'#fff',
     padding:'8px 10px',font:'12px/1.35 system-ui,Segoe UI,Roboto,Arial',borderRadius:'10px',zIndex:9999,maxWidth:'48ch'});
@@ -42,7 +43,11 @@
   function walk(arr,fn){ (function rec(a){ a.forEach(o=>{ fn(o); if(o._objects&&o._objects.length) rec(o._objects); }); })(arr); }
   function idsMap(arr){ const map={}; walk(arr, o=>{ if(o.id) map[o.id]=o; }); return map; }
   function leavesFill(root){
-    const out=[]; walk([root], o=>{ if(o._objects&&o._objects.length) return; if(('fill' in o) && o.type!=='image') out.push(o); });
+    const out=[];
+    walk([root], o=>{
+      if(o._objects&&o._objects.length) return;
+      if(('fill' in o) && o.fill && o.type!=='image') out.push(o); // SOLO fill (no stroke, no imagen)
+    });
     return out;
   }
   function areaOf(o){
@@ -54,10 +59,10 @@
   function rgbParts(rgb){ const m=rgb && rgb.match(/\d+/g); if(!m) return null; return m.map(n=>parseInt(n,10)); }
   function keyFromRGB(rgb){ const p=rgbParts(rgb); if(!p) return null; const [r,g,b]=p; const q=v=>Math.round(v/16)*16; return `rgb(${q(r)}, ${q(g)}, ${q(b)})`; }
 
-  // --- Texturas sobre color (solo fill) ---
+  // Texturas sobre color (solo fill)
   function loadImg(src){ return new Promise(res=>{ if(!src){res(null);return;} const i=new Image(); i.crossOrigin='anonymous'; i.onload=()=>res(i); i.onerror=()=>res(null); i.src=src; }); }
   function tintPattern(img, hex){
-    if(!img) return hex; // sin textura -> color sólido
+    if(!img) return hex; // sin textura → color sólido
     const S=512, off=document.createElement('canvas'); off.width=S; off.height=S;
     const ctx=off.getContext('2d');
     ctx.drawImage(img,0,0,S,S);
@@ -81,25 +86,20 @@
   function buildBucketsAuto(root){
     // 1) todas las hojas con fill
     const all = leavesFill(root._objects?root._objects:[root]);
-
     if(all.length===0){
-      dbg.innerHTML = '⚠️ Modo <b>auto</b>: no se detectaron fills (el SVG puede tener solo strokes o imágenes).';
+      dbg.innerHTML = '⚠️ Modo <b>auto</b>: no se detectaron elementos con fill. (El SVG puede tener solo strokes o imágenes).';
       bucketA=[]; bucketB=[]; mode='auto'; return;
     }
-
-    // 2) agrupa por color aprox y suma áreas
+    // 2) agrupa por color aprox y suma áreas totales → top 2
     const byKey=new Map(), areaSum=new Map();
     all.forEach(o=>{
       const key=keyFromRGB(normColor(o.fill)); if(!key) return;
       if(!byKey.has(key)) { byKey.set(key,[]); areaSum.set(key,0); }
       byKey.get(key).push(o); areaSum.set(key, areaSum.get(key)+areaOf(o));
     });
-
-    // 3) elige los 2 colores de MAYOR ÁREA
     const top=[...byKey.keys()].sort((a,b)=>(areaSum.get(b)||0)-(areaSum.get(a)||0)).slice(0,2);
     bucketA = top[0]? byKey.get(top[0]) : [];
     bucketB = top[1]? byKey.get(top[1]) : [];
-
     const info=top.map((k,i)=>`#${i+1} ${k} → ${byKey.get(k)?.length||0} objs, área≈${Math.round(areaSum.get(k)||0)}`).join('<br>');
     dbg.innerHTML = `✅ SVG cargado (modo <b>auto</b>)<br>${info||'No se detectaron fills'}`;
     mode='auto';
@@ -123,6 +123,7 @@
     const root=fabric.util.groupSVGElements(objs,opts);
     fit(root); canvas.add(root);
 
+    // 1) intentar por IDs; 2) si faltan, pasar a AUTO (sin error)
     if(!buildBucketsById(root)) buildBucketsAuto(root);
     paint();
   },(item,obj)=>{ obj.selectable=false; });
