@@ -11,7 +11,7 @@
   :root{
     --bg:#fafafa;
     --line:#e9e9ec;
-    --terracotta:#8A5A44;   /* tipografía/acentos */
+    --terracotta:#8A5A44;   /* texto/acentos */
     --pink:#E8C2C8;         /* botones y color A por defecto */
     --ink:#3a3a3a;
     --r-lg:16px; --r-md:12px;
@@ -28,19 +28,19 @@
 
   .wrap{max-width:1200px;margin:0 auto;padding:clamp(10px,3vw,20px)}
 
-  /* Logo inline */
+  /* Logo inline (puedes reemplazar el texto por tu SVG real) */
   .brand{display:flex;justify-content:center;align-items:center;margin:6px 0 6px}
   .logo-valonia{height:40px;display:block}
   .logo-valonia *{vector-effect:non-scaling-stroke}
 
-  /* Título */
+  /* Título fino en terracota */
   h1{
     margin:6px 0 12px;
     font:300 clamp(22px,3.6vw,36px)/1.1 "Cormorant Garamond", serif;
     color:var(--terracotta); text-align:center; letter-spacing:.2px;
   }
 
-  /* Layout */
+  /* Layout limpio */
   .grid{
     display:grid; gap:12px;
     grid-template-columns:320px 1fr;
@@ -52,12 +52,11 @@
     .grid{grid-template-columns:1fr; grid-template-areas:"stage" "controls"}
   }
 
-  /* Tarjetas minimal */
   .box{background:transparent;border:0;border-radius:var(--r-lg);box-shadow:none}
   .panel{padding:10px}
   .stage{display:flex;align-items:center;justify-content:center;padding:6px}
 
-  /* Controles */
+  /* Controles mínimos */
   .row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:10px 0}
   label{display:inline-flex;align-items:center;gap:10px}
   label span, label{
@@ -69,14 +68,13 @@
     padding:9px 11px; background:#fff; outline:none;
   }
   select:focus, input:focus{border-color:var(--terracotta); box-shadow:0 0 0 3px rgba(138,90,68,.12)}
-
   input[type="color"]{
     appearance:none; border:none; width:34px; height:34px; padding:0;
     border-radius:12px; overflow:hidden; background:none;
     box-shadow:inset 0 0 0 1px rgba(0,0,0,.08); cursor:pointer;
   }
 
-  /* Botones */
+  /* Botones rosa pastel */
   button{
     cursor:pointer; padding:10px 16px; border-radius:12px;
     border:1px solid var(--line); background:#fff;
@@ -86,8 +84,7 @@
   #dl{ background:var(--pink); border-color:transparent; color:var(--terracotta) }
   button:hover{transform:translateY(-1px)}
 
-  /* ====== PREVIEW PROPORCIONAL REAL ======
-     Marco con ratio 3/4; el canvas rellena el marco. */
+  /* ===== PREVIEW PROPORCIONAL (marco 3:4) ===== */
   .cv-frame{
     width: clamp(260px, 40vw, 420px);  /* desktop */
     aspect-ratio: 3 / 4;               /* 600x800 */
@@ -99,18 +96,16 @@
   }
   @media (max-width:980px){
     .cv-frame{
-      /* encaja en móvil y respeta 3:4; baja 48vh si lo quieres más pequeño */
-      width: min(86vw, calc(48vh * .75));
+      width: min(86vw, calc(48vh * .75));  /* encaja en móvil y respeta 3:4 */
       aspect-ratio: 3 / 4;
     }
   }
-  /* El canvas ocupa el marco; el contenido lo encaja el JS (zoom/centro) */
+  /* El canvas rellena el marco */
   #cv{ width:100% !important; height:100% !important; display:block; }
 </style>
 </head>
 <body>
   <div class="wrap">
-    <!-- Pega aquí tu SVG real si lo tienes -->
     <div class="brand">
       <svg class="logo-valonia" viewBox="0 0 200 40" xmlns="http://www.w3.org/2000/svg" aria-label="Valonia" fill="none" stroke="currentColor" stroke-width="1.2" style="color:#8A5A44">
         <text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" font-family="Cormorant Garamond, serif" font-size="16" fill="#8A5A44">VALONIA</text>
@@ -154,7 +149,7 @@
       </div>
 
       <div class="box stage">
-        <!-- Mantén 600x800; el marco gobierna vista y el JS encaja el contenido -->
+        <!-- Mantén 600x800; el marco gobierna la vista -->
         <div class="cv-frame">
           <canvas id="cv" width="600" height="800"></canvas>
         </div>
@@ -162,111 +157,118 @@
     </div>
   </div>
 
-  <!-- Librería y wizard original -->
+  <!-- Librería y tu JS -->
   <script src="https://cdn.jsdelivr.net/npm/fabric@5.3.0/dist/fabric.min.js"></script>
   <script src="js/customizer.js"></script>
 
-  <!-- 🔧 Auto-encaje del SVG dentro del canvas (sin tocar tu JS) -->
+  <!-- 🔧 Auto-encaje real del contenido (sin tocar tu customizer.js) -->
   <script>
   (function(){
     const el = document.getElementById('cv');
+    let resizing = false, lastFitAt = 0;
 
-    function findFabricInstance(){
-      // 1) Instancias globales típicas
-      if (window.canvas && typeof window.canvas.getObjects === 'function') return window.canvas;
-      if (window.cv && typeof window.cv.getObjects === 'function') return window.cv;
-      // 2) Propiedades colgadas en el propio elemento
-      const guesses = [el.__canvas, el.fabric, el._fabric, el._canvas, el.canvas];
-      for (const g of guesses){ if (g && typeof g.getObjects === 'function') return g; }
-      // 3) Escaneo de propiedades del elemento
-      const names = Object.getOwnPropertyNames(el);
-      for (const k of names){
-        try{
-          const v = el[k];
-          if (v && typeof v.getObjects === 'function' && v.lowerCanvasEl === el) return v;
-        }catch(e){}
-      }
-      // 4) Último recurso: buscar en window
+    function findCanvas(){
+      if (window.canvas && window.canvas.lowerCanvasEl === el) return window.canvas;
+      if (window.cv && window.cv.lowerCanvasEl === el) return window.cv;
+      const cand = [el.__canvas, el.fabric, el._fabric, el._canvas, el.canvas];
+      for (const c of cand) if (c && c.lowerCanvasEl === el) return c;
       for (const k in window){
-        try{
-          const v = window[k];
-          if (v && typeof v.getObjects === 'function' && v.lowerCanvasEl === el) return v;
+        try{ const v = window[k];
+          if (v && v.lowerCanvasEl === el && typeof v.getObjects === 'function') return v;
         }catch(e){}
       }
       return null;
     }
 
-    function fitAll(pad = 16){
-      const c = findFabricInstance();
-      if (!c) return;
-
+    // Calcula el bounding "real" ignorando el viewport actual
+    function getWorldBounds(c){
       const objs = c.getObjects().filter(o => o && o.visible !== false);
-      if (!objs.length){ return; }
+      if (!objs.length) return null;
 
-      // Bounding box global
+      // Guardar/limpiar VPT para medir con aCoords
+      const vpt = c.viewportTransform ? c.viewportTransform.slice() : [1,0,0,1,0,0];
+      c.setViewportTransform([1,0,0,1,0,0]);
+      c.renderAll();
       let minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;
-      objs.forEach(o=>{
-        const b=o.getBoundingRect(true,true);
-        minX=Math.min(minX,b.left);
-        minY=Math.min(minY,b.top);
-        maxX=Math.max(maxX,b.left+b.width);
-        maxY=Math.max(maxY,b.top+b.height);
-      });
-      const bw = maxX - minX, bh = maxY - minY;
-      if (bw<=0 || bh<=0) return;
-
-      const cw = c.getWidth()  - pad*2;
-      const ch = c.getHeight() - pad*2;
-
-      // Zoom que encaja todo
-      const zoom = Math.min(cw / bw, ch / bh);
-      const cx = c.getWidth()/2, cy = c.getHeight()/2;
-      const ox = minX + bw/2,   oy = minY + bh/2;
-
-      c.setViewportTransform([zoom,0,0,zoom, cx - ox*zoom, cy - oy*zoom]);
-      c.requestRenderAll();
+      for (const o of objs){
+        o.setCoords();
+        const a = o.aCoords;
+        minX = Math.min(minX, a.tl.x, a.tr.x, a.bl.x, a.br.x);
+        minY = Math.min(minY, a.tl.y, a.tr.y, a.bl.y, a.br.y);
+        maxX = Math.max(maxX, a.tl.x, a.tr.x, a.bl.x, a.br.x);
+        maxY = Math.max(maxY, a.tl.y, a.tr.y, a.bl.y, a.br.y);
+      }
+      // Restaurar VPT
+      c.setViewportTransform(vpt);
+      return {minX, minY, maxX, maxY, w:maxX-minX, h:maxY-minY};
     }
 
-    // Redimensiona el backstore del canvas al tamaño del marco (manteniendo DPI)
     function sizeBackstoreToFrame(){
       const frame = el.parentElement; // .cv-frame
       const w = Math.max(1, Math.floor(frame.clientWidth));
       const h = Math.max(1, Math.floor(frame.clientHeight));
-      const c = findFabricInstance();
-
-      // Ajuste de dimensiones internas del canvas Fabric
+      const c = findCanvas();
       if (c && typeof c.setDimensions === 'function'){
-        c.setDimensions({ width: w, height: h }, { backstoreOnly:false });
+        c.setDimensions({ width:w, height:h }, { backstoreOnly:false });
       }else{
-        el.width = w; el.height = h;
-        el.style.width = w+'px'; el.style.height = h+'px';
+        el.width = w; el.height = h; el.style.width = w+'px'; el.style.height = h+'px';
       }
     }
 
-    function refresh(){ sizeBackstoreToFrame(); fitAll(18); }
+    function fitAll(pad=16){
+      const c = findCanvas();
+      if (!c) return;
+      const b = getWorldBounds(c);
+      if (!b || b.w<=0 || b.h<=0) return;
 
-    // Espera a que exista la instancia y objetos, luego encaja varias veces
+      const cw = c.getWidth()  - pad*2;
+      const ch = c.getHeight() - pad*2;
+
+      const zoom = Math.min(cw / b.w, ch / b.h);
+      const cx = c.getWidth()/2, cy = c.getHeight()/2;
+      const ox = b.minX + b.w/2,  oy = b.minY + b.h/2;
+
+      c.setViewportTransform([zoom,0,0,zoom, cx - ox*zoom, cy - oy*zoom]);
+      c.requestRenderAll();
+      lastFitAt = Date.now();
+    }
+
+    function refresh(){
+      if (resizing) return;
+      resizing = true;
+      requestAnimationFrame(()=>{
+        sizeBackstoreToFrame();
+        fitAll(18);
+        resizing = false;
+      });
+    }
+
     function bootstrap(){
-      let attempts = 0;
+      let tries=0;
       const t = setInterval(()=>{
-        attempts++;
-        const c = findFabricInstance();
+        tries++;
+        const c = findCanvas();
         if (c && c.getObjects().length){
           clearInterval(t);
           refresh();
-          // Reajusta en los primeros segundos por si el SVG termina de cargar asíncrono
-          let n=0, kick = setInterval(()=>{ refresh(); if(++n>8) clearInterval(kick); }, 200);
-          // Reajusta cuando añadan objetos (cambio de colores/SVG)
-          c.on && c.on('object:added', ()=>setTimeout(refresh,50));
+
+          // Re-encajar en los primeros segundos (carga SVG asíncrona)
+          let n=0, kick = setInterval(()=>{
+            refresh();
+            if (++n>8) clearInterval(kick);
+          }, 180);
+
+          // Re-encajar cuando cambian cosas
+          c.on && c.on('object:added',   ()=>setTimeout(()=>{ if(Date.now()-lastFitAt>50) refresh(); },50));
+          c.on && c.on('object:modified',()=>setTimeout(refresh,50));
         }
-        if (attempts>50) clearInterval(t); // 10s timeout
+        if (tries>60) clearInterval(t); // ~12s timeout
       }, 200);
     }
 
-    window.addEventListener('load',  ()=>{ setTimeout(bootstrap, 50); });
-    window.addEventListener('resize',()=>{ setTimeout(refresh, 50); });
-
-    // Exponer por si quieres llamarlo desde consola o tu JS
+    window.addEventListener('load',  ()=>setTimeout(bootstrap, 60));
+    window.addEventListener('resize',()=>setTimeout(refresh, 60));
+    // Exponer util por si lo quieres llamar manualmente
     window.fitPreview = refresh;
   })();
   </script>
