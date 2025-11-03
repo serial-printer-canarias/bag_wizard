@@ -3,66 +3,142 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Bag Wizard (2 colores / 2 texturas + costura)</title>
+<title>Valonia · Personalizador Tambour</title>
+<meta name="description" content="Personaliza tu bolso Tambour (2 colores / 2 texturas). Vista previa y descarga.">
 <style>
-  :root { --bg:#f7f7f9; --panel:#fff; --line:#e6e6e9; }
-  body{margin:0;background:var(--bg);font:15px/1.45 system-ui,Segoe UI,Roboto,Arial,sans-serif;color:#222}
-  .wrap{max-width:1100px;margin:24px auto;padding:0 16px}
-  h1{font-size:20px;margin:0 0 14px}
-  .grid{display:grid;grid-template-columns:340px 1fr;gap:16px}
-  .box{background:var(--panel);border:1px solid var(--line);border-radius:12px}
-  .panel{padding:14px}
-  .stage{display:flex;align-items:center;justify-content:center;padding:10px}
-  .row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:6px 0}
-  label{display:inline-flex;align-items:center;gap:8px}
-  button{cursor:pointer;padding:8px 10px;border-radius:8px;border:1px solid var(--line);background:#fff}
-  #cv{border:1px dashed var(--line);background:#fff;border-radius:10px;width:600px;height:800px}
+  /* ——— Estilo limpio tipo ficha de producto ——— */
+  :root{
+    --bg:#f6f6f7;
+    --panel:#ffffff;
+    --line:#e8e8eb;
+    --ink:#1f1f1f;
+    --muted:#7a7a82;
+    --accent:#111; /* botón principal */
+    --stitch:#2a2a2a; /* color fijo de costura (solo display) */
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0; background:var(--bg);
+    color:var(--ink);
+    font:15px/1.5 system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+  }
+  .wrap{max-width:1200px;margin:24px auto;padding:0 20px}
+  header{display:flex;align-items:center;justify-content:space-between;margin:6px 0 18px}
+  .brand{font-weight:600;letter-spacing:.02em}
+  .crumbs{color:var(--muted);font-size:13px}
+  .crumbs a{color:inherit;text-decoration:none}
+  .product{
+    display:grid; gap:22px;
+    grid-template-columns: 1fr 420px;
+  }
+  /* Media / canvas */
+  .media{
+    background:var(--panel); border:1px solid var(--line); border-radius:14px;
+    padding:14px; display:flex; align-items:center; justify-content:center;
+    min-height: 860px;
+  }
+  #cv{
+    width:600px;height:800px; background:#fff;
+    border:1px solid var(--line); border-radius:12px;
+    box-shadow: 0 1px 0 rgba(0,0,0,.02), 0 12px 30px rgba(0,0,0,.05);
+  }
+
+  /* Sidebar opciones */
+  .card{
+    background:var(--panel); border:1px solid var(--line); border-radius:14px;
+    padding:18px; position:sticky; top:18px; align-self:start;
+    box-shadow: 0 1px 0 rgba(0,0,0,.02);
+  }
+  h1{font-size:22px;margin:0 0 4px}
+  .sub{color:var(--muted);font-size:13px;margin:0 0 14px}
+  .row{display:flex; align-items:center; gap:10px; margin:10px 0}
+  .row label{min-width:118px;font-weight:600}
+  select, input[type="color"]{
+    height:38px; border-radius:10px; border:1px solid var(--line);
+    padding:0 10px; background:#fff; cursor:pointer;
+  }
+  input[type="color"]{ width:46px; padding:0; }
+  .chip{
+    display:inline-flex; align-items:center; gap:8px;
+    padding:7px 10px; border:1px solid var(--line); border-radius:999px;
+    background:#fff; color:var(--muted); font-size:13px;
+  }
+  .dot{width:16px;height:16px;border-radius:50%; background:var(--stitch); border:1px solid var(--line)}
+  .muted{color:var(--muted)}
+  .btns{display:flex; gap:10px; margin-top:12px; flex-wrap:wrap}
+  button{
+    cursor:pointer; border-radius:10px; border:1px solid var(--line);
+    background:#fff; padding:9px 12px; font-weight:600;
+  }
+  .primary{background:var(--accent); color:#fff; border-color:var(--accent)}
+  .ghost{background:#fff}
+  .note{margin-top:8px;color:var(--muted);font-size:12px}
+
+  /* Ocultar el input de costura pero mantenerlo en el DOM para el JS */
+  .hide{display:none !important;}
+
+  /* Responsive */
+  @media (max-width: 980px){
+    .product{grid-template-columns:1fr}
+    .media{min-height:auto}
+    #cv{width:100%;height:auto;aspect-ratio:3/4}
+  }
 </style>
 </head>
 <body>
   <div class="wrap">
-    <h1>Bag Wizard (2 colores / 2 texturas + costura)</h1>
+    <header>
+      <div class="crumbs"><a href="#">Inicio</a> / <a href="#">Bolsos</a> / Tambour</div>
+      <div class="brand">VALONIA</div>
+    </header>
 
-    <div class="grid">
-      <div class="box panel">
-        <div class="row">
-          <label>Grupo A · Textura
-            <select id="texA">
-              <option value="smooth">Lisa</option>
-              <option value="suede">Ante</option>
-            </select>
-          </label>
-          <input id="colA" type="color" value="#e6e6e6">
-        </div>
-
-        <div class="row">
-          <label>Grupo B · Textura
-            <select id="texB">
-              <option value="smooth">Lisa</option>
-              <option value="suede">Ante</option>
-            </select>
-          </label>
-          <input id="colB" type="color" value="#c61a1a">
-        </div>
-
-        <div class="row">
-          <label>Costura (C)</label>
-          <input id="stitchColor" type="color" value="#2a2a2a">
-        </div>
-
-        <div class="row">
-          <button id="dl">Descargar preview</button>
-          <button id="save">Ver JSON</button>
-          <input type="hidden" id="spbc_config_json">
-        </div>
-      </div>
-
-      <div class="box stage">
+    <div class="product">
+      <!-- Lado izquierdo: canvas -->
+      <div class="media">
         <canvas id="cv" width="600" height="800"></canvas>
       </div>
+
+      <!-- Lado derecho: opciones -->
+      <aside class="card">
+        <h1>Tambour</h1>
+        <p class="sub">Personaliza 2 colores / 2 texturas. El contorno y costura son fijos.</p>
+
+        <div class="row">
+          <label for="texA">Grupo A · Textura</label>
+          <select id="texA">
+            <option value="smooth">Lisa</option>
+            <option value="suede">Ante</option>
+          </select>
+          <input id="colA" type="color" value="#e6e6e6" title="Color Grupo A">
+        </div>
+
+        <div class="row">
+          <label for="texB">Grupo B · Textura</label>
+          <select id="texB">
+            <option value="smooth">Lisa</option>
+            <option value="suede">Ante</option>
+          </select>
+          <input id="colB" type="color" value="#c61a1a" title="Color Grupo B">
+        </div>
+
+        <!-- Costura: solo display. El input existe (oculto) para no tocar el JS -->
+        <div class="row">
+          <label>Costura (C)</label>
+          <span class="chip"><span class="dot"></span> fija</span>
+          <input id="stitchColor" class="hide" type="color" value="#2a2a2a" aria-hidden="true">
+        </div>
+
+        <div class="btns">
+          <button id="dl" class="primary">Descargar preview</button>
+          <button id="save" class="ghost">Ver JSON</button>
+          <input type="hidden" id="spbc_config_json">
+        </div>
+        <p class="note">Nota: contorno negro y costura en color fijo. Texturas simuladas (liso / ante).</p>
+      </aside>
     </div>
   </div>
 
+  <!-- Librería + wizard (sin cambios) -->
   <script src="https://cdn.jsdelivr.net/npm/fabric@5.3.0/dist/fabric.min.js"></script>
   <script src="js/customizer.js"></script>
 </body>
