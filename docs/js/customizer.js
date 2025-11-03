@@ -15,9 +15,22 @@
     dl:$('#dl'), save:$('#save'), hidden:$('#spbc_config_json')
   };
 
-  const W=600,H=800;
+  const W=600,H=800;                 // tamaño nominal (fallback)
+  const cvEl = document.getElementById('cv');
   const canvas=new fabric.Canvas('cv',{selection:false});
   canvas.setWidth(W); canvas.setHeight(H);
+
+  // === AJUSTE RESPONSIVO (único cambio real) =========================
+  // - Sincroniza tamaño interno con el tamaño visible del <canvas>
+  // - Reaplica 'fit' para centrar/escalar el SVG al nuevo tamaño
+  function syncCanvasSize(){
+    const w = Math.max(1, cvEl.clientWidth || W);
+    const h = Math.max(1, cvEl.clientHeight || H);
+    // setDimensions actualiza backstore + css; evita desfase retina
+    canvas.setDimensions({ width:w, height:h }, { backstoreOnly:false });
+  }
+  // Mantén referencia al grupo raíz para refit en cambios de tamaño
+  let rootRef = null;
 
   // Debug
   const dbg=document.createElement('div');
@@ -35,11 +48,22 @@
 
   // ---------- helpers ----------
   function fit(g){
-    const m=24,maxW=W-2*m,maxH=H-2*m;
-    const w=g.width||g.getScaledWidth(),h=g.height||g.getScaledHeight();
-    const s=Math.min(maxW/w,maxH/h);
+    // ⬇️ ahora usamos el tamaño ACTUAL del canvas (no W/H fijos)
+    const CW = canvas.getWidth(), CH = canvas.getHeight();
+    const m = Math.round(Math.min(CW,CH)*0.04);               // ~4% margen
+    const maxW = Math.max(1, CW - 2*m), maxH = Math.max(1, CH - 2*m);
+    // Medidas base del grupo (sin escalar)
+    const w = g.width  || g.getScaledWidth()  || 1;
+    const h = g.height || g.getScaledHeight() || 1;
+    const s = Math.min(maxW / w, maxH / h);
     g.scale(s);
-    g.set({left:(W-w*s)/2,top:(H-h*s)/2,selectable:false,evented:false});
+    g.set({
+      left:(CW - w*s)/2,
+      top:(CH - h*s)/2,
+      selectable:false,
+      evented:false
+    });
+    canvas.requestRenderAll();
   }
   function walk(arr,fn){ (function rec(a){ a.forEach(o=>{ fn(o); if(o._objects&&o._objects.length) rec(o._objects); }); })(arr); }
   function leafs(root){ const out=[]; walk([root], o=>{ if(o._objects&&o._objects.length) return; if(o.type==='image') return; out.push(o); }); return out; }
@@ -315,7 +339,10 @@
 
   fabric.loadSVGFromURL(SVG,(objs,opts)=>{
     const root=fabric.util.groupSVGElements(objs,opts);
-    fit(root); canvas.add(root);
+    rootRef = root;                 // << guardamos referencia para refit
+    syncCanvasSize();               // << al cargar, igualamos tamaños
+    fit(root);                      // << encaje al tamaño visible actual
+    canvas.add(root);
 
     // --- nuevo: detectar y configurar costura (C) ---
     collectStitch(root);
@@ -350,5 +377,19 @@
       version:'1.0.1'
     });
     alert(ui.hidden.value);
+  });
+
+  // === Observadores de tamaño (responsive real) ======================
+  // Refit cuando cambie el tamaño visible del canvas (por CSS/rotación)
+  if ('ResizeObserver' in window){
+    const ro = new ResizeObserver(()=>{
+      syncCanvasSize();
+      if (rootRef) fit(rootRef);
+    });
+    ro.observe(cvEl);
+  }
+  window.addEventListener('resize', ()=>{
+    syncCanvasSize();
+    if (rootRef) fit(rootRef);
   });
 })();
