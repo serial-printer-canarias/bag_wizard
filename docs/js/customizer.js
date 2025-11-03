@@ -14,60 +14,12 @@
     dl:$('#dl'), save:$('#save'), hidden:$('#spbc_config_json')
   };
 
-  // Tamaño nominal; la vista real se sincroniza con el tamaño visible.
   const W=600,H=800;
   const cvEl = document.getElementById('cv');
   const canvas=new fabric.Canvas('cv',{selection:false});
   canvas.setWidth(W); canvas.setHeight(H);
 
-  // ====== AJUSTE DE VISTA (lo único que cambia de verdad) ======
-  // 1) sincroniza el backstore con el tamaño visible del canvas
-  function syncCanvasSize(){
-    const w = Math.max(1, cvEl.clientWidth  || W);
-    const h = Math.max(1, cvEl.clientHeight || H);
-    canvas.setDimensions({ width:w, height:h }, { backstoreOnly:false });
-  }
-
-  // 2) encaje del grupo dentro del canvas actual (centrado, con margen)
-  //    primera vez más pequeño para que respire en móvil.
-  let firstFit = true;
-  const INITIAL_SHRINK = 0.78; // ⬅️ arrancar más pequeño (ajusta si quieres)
-  function fit(g){
-    if(!g) return;
-
-    // medidas base del SVG (sin acumulaciones)
-    if(!g.__w0){ g.__w0 = g.width  || g.getScaledWidth()  || 1; }
-    if(!g.__h0){ g.__h0 = g.height || g.getScaledHeight() || 1; }
-
-    const CW = canvas.getWidth(), CH = canvas.getHeight();
-    const m  = Math.round(Math.min(CW,CH)*0.06); // margen ~6%
-    const maxW = Math.max(1, CW - 2*m);
-    const maxH = Math.max(1, CH - 2*m);
-
-    let s = Math.min(maxW / g.__w0, maxH / g.__h0);
-    if(firstFit) s *= INITIAL_SHRINK; // primera vista más pequeño
-
-    g.set({
-      scaleX:s, scaleY:s,
-      left:(CW - g.__w0*s)/2,
-      top:(CH - g.__h0*s)/2,
-      selectable:false, evented:false
-    });
-    g.setCoords();
-    canvas.requestRenderAll();
-
-    firstFit = false;
-  }
-
-  // Reencajar cuando cambie el tamaño visible
-  let rootRef = null;
-  if('ResizeObserver' in window){
-    const ro = new ResizeObserver(()=>{ syncCanvasSize(); if(rootRef) fit(rootRef); });
-    ro.observe(cvEl);
-  }
-  window.addEventListener('resize', ()=>{ syncCanvasSize(); if(rootRef) fit(rootRef); });
-
-  // =================== RESTO: SIN CAMBIOS FUNCIONALES ===================
+  // Debug
   const dbg=document.createElement('div');
   Object.assign(dbg.style,{position:'fixed',top:'8px',right:'8px',background:'rgba(0,0,0,.85)',color:'#fff',
     padding:'8px 10px',font:'12px/1.35 system-ui,Segoe UI,Roboto,Arial',borderRadius:'10px',zIndex:9999,maxWidth:'48ch'});
@@ -80,6 +32,71 @@
 
   let imgSmooth=null, imgSuede=null;
 
+  // ======== AJUSTE DE VISTA: encaje por viewport, sin deformar ========
+  function syncCanvasSize(){
+    const w = Math.max(1, cvEl.clientWidth  || W);
+    const h = Math.max(1, cvEl.clientHeight || H);
+    canvas.setDimensions({ width:w, height:h }, { backstoreOnly:false });
+  }
+
+  // Bounding de TODOS los objetos en coords mundo (VPT identidad)
+  function getWorldBounds(){
+    const old = canvas.viewportTransform ? canvas.viewportTransform.slice() : [1,0,0,1,0,0];
+    canvas.setViewportTransform([1,0,0,1,0,0]);
+    canvas.renderAll();
+
+    const objs = canvas.getObjects().filter(o=>o && o.visible !== false);
+    if(!objs.length){ canvas.setViewportTransform(old); return null; }
+
+    let minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;
+    for(const o of objs){
+      o.setCoords();
+      const r=o.getBoundingRect(true,true);
+      minX=Math.min(minX,r.left);
+      minY=Math.min(minY,r.top);
+      maxX=Math.max(maxX,r.left+r.width);
+      maxY=Math.max(maxY,r.top +r.height);
+    }
+    canvas.setViewportTransform(old);
+    return {x:minX,y:minY,w:maxX-minX,h:maxY-minY};
+  }
+
+  let firstFit=true;
+  function fit(){
+    syncCanvasSize();
+
+    const b = getWorldBounds();
+    if(!b || b.w<=0 || b.h<=0) return;
+
+    const CW = canvas.getWidth(), CH = canvas.getHeight();
+    const pad = Math.round(Math.min(CW,CH)*0.06); // margen limpio
+    const availW = Math.max(1, CW - 2*pad);
+    const availH = Math.max(1, CH - 2*pad);
+
+    let zoom = Math.min(availW / b.w, availH / b.h);
+    if(firstFit) zoom *= 0.80; // primera vista más pequeño (visible entero)
+
+    // centro del canvas y del bolso
+    const cx = CW/2, cy = CH/2;
+    const bx = b.x + b.w/2, by = b.y + b.h/2;
+
+    // VPT = zoom + translate para centrar
+    const tx = cx - bx*zoom;
+    const ty = cy - by*zoom;
+    canvas.setViewportTransform([zoom,0,0,zoom,tx,ty]);
+    canvas.requestRenderAll();
+
+    firstFit=false;
+  }
+
+  // Refit automático cuando cambie el tamaño visible
+  if('ResizeObserver' in window){
+    const ro=new ResizeObserver(()=>fit());
+    ro.observe(cvEl);
+  }
+  window.addEventListener('resize', fit);
+
+  // ---------- helpers de tu lógica ----------
   function walk(arr,fn){ (function rec(a){ a.forEach(o=>{ fn(o); if(o._objects&&o._objects.length) rec(o._objects); }); })(arr); }
   function leafs(root){ const out=[]; walk([root], o=>{ if(o._objects&&o._objects.length) return; if(o.type==='image') return; out.push(o); }); return out; }
   function idsMap(arr){ const map={}; walk(arr,o=>{ if(o.id) map[o.id]=o; }); return map; }
@@ -93,6 +110,7 @@
   const bboxArea=o=>Math.max(1,getW(o)*getH(o));
   const centerX=o=>{ const r=o.getBoundingRect(true,true); return r.left + r.width/2; };
 
+  // ---------- color ----------
   function parseColor(str){
     if(!str || typeof str!=='string') return null;
     const s=str.trim().toLowerCase();
@@ -131,10 +149,12 @@
     if(!hasVisibleFill(o)) return false;
     const rgb=parseColor(o.fill);
     if(!rgb) return false;
-    if(!(nearGray(rgb,28) && luma(rgb)<90)) return false; // oscuro
+    if(!(nearGray(rgb,28) && luma(rgb)<90)) return false;
     const a=bboxArea(o);
     return a <= areaRoot*0.02;
   }
+
+  // ---------- clustering ----------
   function rgb2hsv([r,g,b]){
     r/=255; g/=255; b/=255;
     const max=Math.max(r,g,b), min=Math.min(r,g,b);
@@ -153,6 +173,7 @@
   function kmeans2_mix(objs){
     if(objs.length<=2) return {A:objs,B:[]};
     const weightHue=1.0, weightPos=0.6;
+
     const items = objs.map(o=>{
       const rgb=baseRGB(o);
       let hx=0, hy=0;
@@ -163,14 +184,17 @@
       const x=centerX(o);
       return {o,hx,hy,x,w:areaMetric(o)};
     });
+
     const xs=items.map(i=>i.x);
     const minX=Math.min(...xs), maxX=Math.max(...xs) || (minX+1);
     items.forEach(i=>{ i.p=((i.x-minX)/(maxX-minX))*weightPos; });
+
     let c1={hx:0,hy:0,p:Math.min(...items.map(i=>i.p))};
     let c2={hx:0,hy:0,p:Math.max(...items.map(i=>i.p))};
-    const dist=(a,b)=>{ const dx=a.hx-b.hx, dy=a.hy-b.hy, dp=a.p-b.p; return dx*dx+dy*dx+dp*dp; };
+    const dist=(a,b)=>{ const dx=a.hx-b.hx, dy=a.hy-b.hy, dp=a.p-b.p; return dx*dx+dy*dy+dp*dp; };
     const mean=arr=>{ const W=arr.reduce((s,i)=>s+i.w,0)||1;
       return {hx:arr.reduce((s,i)=>s+i.hx*i.w,0)/W, hy:arr.reduce((s,i)=>s+i.hy*i.w,0)/W, p:arr.reduce((s,i)=>s+i.p*i.w,0)/W}; };
+
     for(let it=0; it<10; it++){
       const A=[],B=[]; items.forEach(i=>{ (dist(i,c1)<=dist(i,c2)?A:B).push(i); });
       if(!A.length || !B.length){
@@ -179,9 +203,7 @@
         return {A:A2.map(i=>i.o), B:B2.map(i=>i.o)};
       }
       const n1=mean(A), n2=mean(B);
-      if(Math.abs(n1-c1)<1e-3 && Math.abs(n2-c2)<1e-3 &&
-         Math.abs(n1.hx-c1.hx)<1e-3 && Math.abs(n2.hx-c2.hx)<1e-3 &&
-         Math.abs(n1.hy-c1.hy)<1e-3 && Math.abs(n2.hy-c2.hy)<1e-3) break;
+      if(Math.abs(n1-p1)<1e-3 && Math.abs(n2-p2)<1e-3) break;
       c1=n1; c2=n2;
     }
     const A=[],B=[]; items.forEach(i=>{ (dist(i,c1)<=dist(i,c2)?A:B).push(i); });
@@ -201,6 +223,7 @@
     return [A,B];
   }
 
+  // texturas
   function loadImg(src){ return new Promise(res=>{ if(!src){res(null);return;} const i=new Image(); i.crossOrigin='anonymous'; i.onload=()=>res(i); i.onerror=()=>res(null); i.src=src; }); }
   function tintPattern(img,hex){
     if(!img) return hex;
@@ -213,9 +236,11 @@
   }
   const applyFill=(o,mat)=>{ if('fill' in o) o.set('fill',mat); else o.fill=mat; };
 
+  // --------- OUTLINE ----------
   function styleAndCollectOutlines(root){
     outlineSet=new Set();
     const areaRoot = (root.getScaledWidth?.()||getW(root)) * (root.getScaledHeight?.()||getH(root)) || (W*H);
+
     const ids=idsMap(root._objects?root._objects:[root]);
     const gOutline = ids['body_x5F_clip'] || ids['outline'] || ids['outlines'] || null;
     if(gOutline){
@@ -231,6 +256,7 @@
       });
       const parent = gOutline.group || root; bringChildToTop(parent, gOutline);
     }
+
     leafs(root).forEach(o=>{
       if(outlineSet.has(o)) return;
       if(isOutlineStroke(o) || isInkDetail(o, areaRoot)){
@@ -245,11 +271,13 @@
     });
   }
 
+  // --------- STITCH ----------
   function collectStitch(root){
     stitchSet = new Set();
     const ids=idsMap(root._objects?root._objects:[root]);
     const gStitch = ids['stitch'] || ids['costura'] || ids['seams'] || ids['stitching'] || null;
     if(!gStitch) return;
+
     const leaves = leafs(gStitch);
     leaves.forEach(o=>{
       stitchSet.add(o);
@@ -267,6 +295,7 @@
     const parent = gStitch.group || root; bringChildToTop(parent, gStitch);
   }
 
+  // --------- buckets ----------
   function buildBuckets(root){
     const allLeaves = leafs(root);
     const paintables = allLeaves.filter(o=>!outlineSet.has(o) && !stitchSet.has(o));
@@ -291,12 +320,27 @@
     dbg.innerHTML=`✅ SVG cargado (modo <b>auto-geom</b>) · A: ${AX.length} · B: ${BX.length} · stitch: ${stitchSet.size} · outline: ${outlineSet.size}`;
   }
 
+  // --------- pintado ----------
+  function loadImg(src){ return new Promise(res=>{ if(!src){res(null);return;} const i=new Image(); i.crossOrigin='anonymous'; i.onload=()=>res(i); i.onerror=()=>res(null); i.src=src; }); }
+  function tintPattern(img,hex){
+    if(!img) return hex;
+    const S=512, off=document.createElement('canvas'); off.width=S; off.height=S;
+    const ctx=off.getContext('2d');
+    ctx.drawImage(img,0,0,S,S);
+    ctx.globalCompositeOperation='multiply'; ctx.fillStyle=hex||'#ffffff'; ctx.fillRect(0,0,S,S);
+    ctx.globalCompositeOperation='destination-over'; ctx.fillStyle='#fff'; ctx.fillRect(0,0,S,S);
+    return new fabric.Pattern({ source: off, repeat:'repeat' });
+  }
+  const applyFill=(o,mat)=>{ if('fill' in o) o.set('fill',mat); else o.fill=mat; };
+
   function paint(){
     const colA=ui.colA.value||'#e6e6e6', colB=ui.colB.value||'#c61a1a';
     const patA=tintPattern(ui.texA.value==='suede'?imgSuede:imgSmooth, colA);
     const patB=tintPattern(ui.texB.value==='suede'?imgSuede:imgSmooth, colB);
+
     bucketA.forEach(o=>{ applyFill(o, patA); o.dirty=true; });
     bucketB.forEach(o=>{ applyFill(o, patB); o.dirty=true; });
+
     outlineSet.forEach(o=>{
       if(hasStroke(o) || !hasVisibleFill(o)){
         o.set({fill:'none', stroke:'#111'});
@@ -306,6 +350,7 @@
       if(o.group) bringChildToTop(o.group,o);
       o.dirty=true;
     });
+
     if(ui.stitch){
       const sc = ui.stitch.value || '#2a2a2a';
       stitchSet.forEach(o=>{
@@ -314,6 +359,7 @@
         o.dirty=true;
       });
     }
+
     canvas.requestRenderAll();
   }
 
@@ -321,24 +367,18 @@
 
   fabric.loadSVGFromURL(SVG,(objs,opts)=>{
     const root=fabric.util.groupSVGElements(objs,opts);
-    rootRef = root;
-
-    syncCanvasSize();      // ← iguala backstore al tamaño visible del marco
-    // baseline para fit
-    root.__w0 = root.width;
-    root.__h0 = root.height;
-
-    // Añadimos y pintamos como siempre
     canvas.add(root);
+
     collectStitch(root);
     styleAndCollectOutlines(root);
     buildBuckets(root);
     paint();
 
-    // Encaje inicial (más pequeño, ya centrado)
-    fit(root);
+    // Encaje inicial (centrado y completo)
+    fit();
   },(item,obj)=>{ obj.selectable=false; });
 
+  // UI
   ['change','input'].forEach(ev=>{
     ui.colA.addEventListener(ev, paint);
     ui.colB.addEventListener(ev, paint);
