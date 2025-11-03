@@ -3,137 +3,233 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Bag Wizard (2 colores / 2 texturas + costura)</title>
+<title>Bag Wizard · Valonia</title>
 
 <style>
   :root{
     --bg:#f7f7f9;
     --ink:#221E1B;
-    --rose:#E7BFC2;           /* botones / chip color */
-    --terra:#8C5A45;          /* texto principal (Valonia) */
-    --frameW: min(88vw, 540px);  /* ancho visual del canvas y del panel */
+    --terra:#8C5A45;     /* texto principal */
+    --rose:#E7BFC2;      /* botones */
+    --line:#eaeaea;
+    --panelW: 360px;     /* ancho del panel derecho */
   }
 
-  /* Didot LP local (opcional). Si no existe usa fallback. */
+  /* Didot LP local (opcional). Si no existe, usa fallback. */
   @font-face{
     font-family:"Didot LP";
     src:url("assets/fonts/DidotLP.woff2") format("woff2");
     font-weight:300 700; font-style:normal; font-display:swap;
   }
 
-  html,body{margin:0;padding:0;background:var(--bg);color:var(--ink)}
+  html,body{margin:0;background:var(--bg);color:var(--ink)}
   body{font:15px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif}
 
-  /* Cabecera Valonia */
-  .brand{
-    display:flex;flex-direction:column;align-items:center;
-    gap:14px; margin:26px 0 18px;
-  }
-  .brand img{height:86px;object-fit:contain;display:block}
+  /* Cabecera */
+  .brand{display:flex;flex-direction:column;align-items:center;gap:14px;margin:26px 0 16px}
+  .brand img{height:86px;display:block;object-fit:contain}
   .brand h1{
-    margin:0;
-    font-family:"Didot LP","Didot","Bodoni Moda","Playfair Display",Times,serif;
-    font-weight:400; font-size:22px; line-height:1.2;
-    letter-spacing:.02em; color:var(--terra);
+    margin:0;font-family:"Didot LP","Didot","Bodoni Moda","Playfair Display",Times,serif;
+    font-weight:400;font-size:22px;letter-spacing:.02em;line-height:1.2;color:var(--terra);
   }
 
-  /* Contenedor principal en columna */
-  .wrap{max-width:1200px;margin:0 auto;padding:0 18px 36px}
+  /* Layout principal: canvas izquierda, panel derecha */
+  .wrap{max-width:1200px;margin:0 auto;padding:0 18px 34px}
+  .grid{display:grid;grid-template-columns: 1fr var(--panelW);gap:28px;align-items:start}
+  @media (max-width:980px){ .grid{grid-template-columns:1fr;gap:18px} }
 
-  /* Escenario centrado, sin bordes */
-  .stage{
-    width:var(--frameW); margin:0 auto 14px auto;
-    display:flex;justify-content:center;align-items:center;
-    background:transparent;border:none;padding:0;
-  }
-  /* Canvas responsive por CSS (no tocamos objetos internos) */
-  #cv{display:block;width:100%;height:auto;background:transparent;border:none;border-radius:0}
+  /* Escenario limpio (sin borde) a la izquierda */
+  .stage{background:transparent;border:none;padding:0;display:flex;justify-content:flex-start}
+  #cv{display:block;background:transparent;border:none;border-radius:0;
+      width:clamp(340px, 58vw, 620px); height:auto;}
 
-  /* Panel de opciones centrado bajo el canvas */
-  .options{
-    width:var(--frameW); margin:0 auto;
-    background:transparent; border:none; padding:0;
-  }
-  .row{
-    display:flex;align-items:center;gap:10px;flex-wrap:wrap;
-    margin:10px 0;
-  }
+  /* Panel derecho (opciones) */
+  .panel{background:transparent;border:1px solid var(--line);border-radius:14px;padding:16px}
+  .row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:10px 0}
   .lbl{
     font-family:"Didot LP","Didot","Bodoni Moda","Playfair Display",Times,serif;
-    font-weight:400; font-size:12px; letter-spacing:.12em; text-transform:uppercase;
-    color:var(--terra);
+    font-weight:400;font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--terra)
   }
   select{
-    appearance:none;-webkit-appearance:none;
-    border:1px solid #e9e9e9; border-radius:12px;
-    padding:6px 30px 6px 10px; background:#fff; font-size:13px;
+    appearance:none;-webkit-appearance:none;background:#fff;
+    border:1px solid var(--line);border-radius:12px;padding:6px 28px 6px 10px;font-size:13px
   }
   input[type="color"]{
-    width:30px;height:30px;border-radius:50%;
-    border:2px solid #efefef;background:#fff;box-shadow:0 1px 0 rgba(0,0,0,.03);
+    width:28px;height:28px;border-radius:50%;border:2px solid #efefef;background:#fff;box-shadow:0 1px 0 rgba(0,0,0,.03)
   }
-  .row--stitch{display:none} /* ocultamos el control de costura */
-
+  .row--stitch{display:none} /* ocultamos control de costura */
   .actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:6px}
   button{
-    cursor:pointer;border-radius:12px;padding:9px 14px;font-weight:600;
-    border:1px solid #e9e9e9;background:var(--rose);color:#5a3a2c
+    cursor:pointer;border-radius:12px;padding:9px 14px;font-weight:600;border:1px solid var(--line);
+    background:var(--rose);color:#5a3a2c
   }
 
-  /* Desktop un poco más contenido aún */
-  @media (min-width:1100px){
-    :root{ --frameW: 520px; }
+  /* Formulario de pedido */
+  .order{max-width:860px;margin:24px auto 0 auto;border:1px solid var(--line);border-radius:14px;padding:16px;background:#fff}
+  .order h2{
+    margin:0 0 12px 0;font-family:"Didot LP","Didot","Bodoni Moda","Playfair Display",Times,serif;
+    font-weight:400;font-size:18px;letter-spacing:.02em;color:var(--terra)
   }
+  .form-grid{display:grid;grid-template-columns: 1fr 1fr;gap:12px}
+  @media (max-width:720px){ .form-grid{grid-template-columns:1fr} }
+  .order label{font-size:13px;color:#6c5a4f}
+  .order input,.order textarea{
+    width:100%;border:1px solid var(--line);border-radius:10px;padding:10px;background:#fff;font-size:14px
+  }
+  .order textarea{min-height:90px;resize:vertical}
+  .small{font-size:12px;color:#7a7a7a}
 </style>
 </head>
 <body>
 
   <!-- Logo + título -->
   <div class="brand">
-    <!-- coloca el PNG en assets/img/logo-valonia.png -->
     <img src="assets/img/logo-valonia.png" alt="Valonia">
     <h1>Diseña tu Tambour</h1>
   </div>
 
   <div class="wrap">
-    <!-- Canvas centrado -->
-    <div class="stage">
-      <canvas id="cv" width="600" height="800"></canvas>
+    <div class="grid">
+      <!-- Izquierda: canvas -->
+      <div class="stage">
+        <canvas id="cv" width="600" height="800"></canvas>
+      </div>
+
+      <!-- Derecha: opciones -->
+      <aside class="panel">
+        <div class="row">
+          <span class="lbl">1º cuero · textura</span>
+          <select id="texA">
+            <option value="smooth">Lisa</option>
+            <option value="suede">Ante</option>
+          </select>
+          <input id="colA" type="color" value="#E7BFC2" aria-label="Color del primer cuero">
+        </div>
+
+        <div class="row">
+          <span class="lbl">2º cuero · textura</span>
+          <select id="texB">
+            <option value="smooth">Lisa</option>
+            <option value="suede">Ante</option>
+          </select>
+          <input id="colB" type="color" value="#8C5A45" aria-label="Color del segundo cuero">
+        </div>
+
+        <div class="row row--stitch">
+          <span class="lbl">Costura (C)</span>
+          <input id="stitchColor" type="color" value="#111111">
+        </div>
+
+        <div class="actions">
+          <button id="dl">Descargar preview</button>
+          <input type="hidden" id="spbc_config_json">
+        </div>
+      </aside>
     </div>
 
-    <!-- Opciones centradas (debajo del canvas) -->
-    <div class="options">
-      <div class="row">
-        <span class="lbl">1º cuero · textura</span>
-        <select id="texA" aria-label="Textura del primer cuero">
-          <option value="smooth">Lisa</option>
-          <option value="suede">Ante</option>
-        </select>
-        <input id="colA" type="color" value="#E7BFC2" aria-label="Color del primer cuero">
-      </div>
+    <!-- Debajo: formulario de pedido -->
+    <section class="order">
+      <h2>Datos para tu pedido</h2>
+      <form id="orderForm">
+        <div class="form-grid">
+          <div>
+            <label>Nombre y apellidos</label>
+            <input name="name" required>
+          </div>
+          <div>
+            <label>Email</label>
+            <input name="email" type="email" required>
+          </div>
+          <div>
+            <label>Teléfono</label>
+            <input name="phone" type="tel">
+          </div>
+          <div>
+            <label>Referencia de pedido (opcional)</label>
+            <input name="ref">
+          </div>
+          <div style="grid-column:1/-1">
+            <label>Notas</label>
+            <textarea name="notes" placeholder="Color interior, largo de correa, observaciones…"></textarea>
+          </div>
+          <div style="grid-column:1/-1">
+            <label class="small">
+              <input type="checkbox" required> Acepto la política de privacidad y el tratamiento de datos para gestionar este pedido.
+            </label>
+          </div>
+        </div>
 
-      <div class="row">
-        <span class="lbl">2º cuero · textura</span>
-        <select id="texB" aria-label="Textura del segundo cuero">
-          <option value="smooth">Lisa</option>
-          <option value="suede">Ante</option>
-        </select>
-        <input id="colB" type="color" value="#8C5A45" aria-label="Color del segundo cuero">
-      </div>
-
-      <div class="row row--stitch">
-        <span class="lbl">Costura (C)</span>
-        <input id="stitchColor" type="color" value="#111111" aria-label="Color de la costura">
-      </div>
-
-      <div class="actions">
-        <button id="dl">Descargar preview</button>
-        <input type="hidden" id="spbc_config_json">
-      </div>
-    </div>
+        <div class="actions" style="margin-top:12px">
+          <button type="submit" id="orderBtn">Generar PDF del pedido</button>
+        </div>
+        <p class="small">El PDF incluirá la previsualización del bolso y la configuración elegida. Puedes adjuntarlo en tu flujo de compra de valoniabrand.com.</p>
+      </form>
+    </section>
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/fabric@5.3.0/dist/fabric.min.js"></script>
+  <!-- jsPDF para crear el PDF del pedido -->
+  <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
   <script src="js/customizer.js"></script>
+
+  <script>
+    // PDF del pedido (cliente)
+    const form = document.getElementById('orderForm');
+    form.addEventListener('submit', async (e)=>{
+      e.preventDefault();
+      if(!window.getWizardSnapshot){ alert('Preview todavía no está lista.'); return; }
+
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF({unit:'pt', format:'a4'});
+      const pageW = doc.internal.pageSize.getWidth();
+
+      // Título
+      doc.setFont('times','normal'); doc.setFontSize(14);
+      doc.text('VALONIA — Pedido personalizado Tambour', 40, 50);
+
+      // Snapshot (PNG) y config
+      const snap = window.getWizardSnapshot();
+      const img = snap.png;
+      const imgProps = doc.getImageProperties(img);
+      const imgW = Math.min(pageW - 80, 360);
+      const imgH = imgProps.height * (imgW / imgProps.width);
+      doc.addImage(img, 'PNG', 40, 80, imgW, imgH);
+
+      const data = new FormData(form);
+      const y0 = 80 + imgH + 20;
+
+      const conf = snap.config;
+      doc.setFontSize(11);
+      doc.text(`Nombre: ${data.get('name')||''}`, 40, y0);
+      doc.text(`Email: ${data.get('email')||''}`, 40, y0+16);
+      doc.text(`Teléfono: ${data.get('phone')||''}`, 40, y0+32);
+      if (data.get('ref')) doc.text(`Referencia: ${data.get('ref')}`, 40, y0+48);
+
+      doc.text(`1º cuero: ${conf.A.texture} · ${conf.A.color}`, 40, y0+74);
+      doc.text(`2º cuero: ${conf.B.texture} · ${conf.B.color}`, 40, y0+90);
+      doc.text(`Costura: ${conf.C.color}`, 40, y0+106);
+
+      // Muestras de color
+      function swatch(x,y,hex){ try{ doc.setFillColor(hex); }catch{} doc.setDrawColor('#aaaaaa'); doc.roundedRect(x,y,14,14,2,2,'FD'); }
+      swatch(pageW-100, y0+66, conf.A.color);
+      swatch(pageW-70,  y0+66, conf.B.color);
+      swatch(pageW-40,  y0+66, conf.C.color);
+
+      // Notas
+      const notes = (data.get('notes')||'').toString();
+      const notesTop = y0+132;
+      doc.text('Notas:', 40, notesTop);
+      const notesLines = doc.splitTextToSize(notes, pageW-80);
+      doc.text(notesLines, 40, notesTop+16);
+
+      // Config JSON al final
+      const json = JSON.stringify(conf);
+      const jsonTop = notesTop + 16 + notesLines.length*12 + 12;
+      doc.text('Config:', 40, jsonTop);
+      doc.text(doc.splitTextToSize(json, pageW-80), 40, jsonTop+16);
+
+      doc.save(`valonia-pedido-${Date.now()}.pdf`);
+    });
+  </script>
 </body>
 </html>
