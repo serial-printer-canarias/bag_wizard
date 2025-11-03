@@ -4,79 +4,126 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Bag Wizard (2 colores / 2 texturas + costura)</title>
+
 <style>
   :root{
-    --bg:#f7f7f9; --panel:#fff; --line:#e6e6e9;
-    --valonia-terracotta:#8C5A45;  /* texto */
-    --valonia-rose:#e7bfc2;        /* botones/chips */
+    --bg:#f7f7f9;
+    --ink:#221E1B;
+    --line:#eaeaea;
+    --rose:#E7BFC2;            /* botones / chip color */
+    --terra:#8C5A45;           /* texto principal (Valonia) */
   }
-  body{margin:0;background:var(--bg);font:15px/1.45 system-ui,Segoe UI,Roboto,Arial,sans-serif;color:#222}
-  .wrap{max-width:1100px;margin:24px auto;padding:0 16px}
-  h1{font-size:28px;font-weight:400;letter-spacing:.02em;color:var(--valonia-terracotta);text-align:center;margin:0 0 18px}
-  .grid{display:grid;grid-template-columns:340px 1fr;gap:16px}
-  .box{background:var(--panel);border:1px solid var(--line);border-radius:12px}
-  .panel{padding:14px}
-  .stage{padding:10px}
-  .row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:6px 0}
-  label{display:inline-flex;align-items:center;gap:8px}
-  button{cursor:pointer;padding:10px 14px;border-radius:10px;border:1px solid var(--line);background:var(--valonia-rose);color:#5a3a2c;font-weight:600}
-  input[type="color"]{width:42px;height:42px;border-radius:12px;border:2px solid #eee}
-  /* Marco del canvas (limpio, 3:4) */
-  .canvas-box{
-    margin:0 auto; width:100%; max-width:720px;
-    border:1px dashed var(--line); border-radius:12px; background:#fff;
-    /* altura la pone JS; aquí solo reservamos algo para que no “salte” el layout */
-    min-height:300px;
+
+  /* Base */
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--ink)}
+  body{font:15px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif}
+
+  /* Cabecera Valonia */
+  .brand{display:flex;flex-direction:column;align-items:center;gap:10px;margin:22px 0 6px}
+  .brand img{height:56px;object-fit:contain;display:block}
+  .brand h1{
+    margin:0;
+    font-size:26px; line-height:1.2; font-weight:300;
+    letter-spacing:.02em; color:var(--terra);
   }
-  #cv{display:block; width:100%; height:100%;}
-  @media (max-width:980px){
-    .grid{grid-template-columns:1fr;gap:18px}
-    .canvas-box{max-width:680px}
+
+  /* Layout */
+  .wrap{max-width:1200px;margin:0 auto;padding:0 18px 28px}
+  .grid{display:grid;grid-template-columns:360px 1fr;gap:24px;align-items:start}
+  @media (max-width:980px){ .grid{grid-template-columns:1fr;gap:18px} }
+
+  /* Panel de controles (limpio y fino) */
+  .panel{
+    background:transparent;
+    border:1px solid var(--line);
+    border-radius:14px;
+    padding:16px;
+  }
+  .row{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:10px 0}
+  label{font-weight:600;letter-spacing:.02em;color:var(--terra)}
+  select{
+    appearance:none; -webkit-appearance:none;
+    border:1px solid var(--line); border-radius:12px; padding:8px 36px 8px 12px;
+    background:#fff; font-size:14px;
+  }
+  input[type="color"]{
+    width:44px;height:44px;border-radius:12px;border:2px solid #efefef; background:#fff;
+    box-shadow:0 1px 0 rgba(0,0,0,.03);
+  }
+  .row--stitch{ display:none; } /* Costura no visible en la página */
+
+  .actions{display:flex;gap:12px;flex-wrap:wrap;margin-top:6px}
+  button{
+    cursor:pointer; border-radius:12px; padding:10px 16px; font-weight:600;
+    border:1px solid var(--line); background:var(--rose); color:#5a3a2c;
+  }
+  .ghost{background:#fff;color:var(--ink)}
+
+  /* Escenario: TODO limpio, sin fondos blancos, sin borde discontinuo */
+  .stage{
+    background:transparent;
+    border:1px solid var(--line);  /* trazo muy fino, elegante */
+    border-radius:16px;
+    padding:10px;
+  }
+
+  /* Canvas responsive por CSS (no toca objetos internos) */
+  #cv{
+    display:block;
+    width:100%;
+    height:auto;     /* mantiene proporción 600x800 */
+    background:transparent; /* sin fondo blanco visible */
+    border-radius:12px;
   }
 </style>
 </head>
 <body>
-  <div class="wrap">
+
+  <!-- Logo y título (logo centrado) -->
+  <div class="brand">
+    <!-- coloca tu PNG en assets/img/logo-valonia.png -->
+    <img src="assets/img/logo-valonia.png" alt="Valonia">
     <h1>Diseña tu Tambour</h1>
+  </div>
 
+  <div class="wrap">
     <div class="grid">
-      <div class="box panel">
+      <!-- Controles -->
+      <div class="panel">
         <div class="row">
-          <label>GRUPO A · TEXTURA
-            <select id="texA">
-              <option value="smooth">Lisa</option>
-              <option value="suede">Ante</option>
-            </select>
-          </label>
-          <input id="colA" type="color" value="#e7bfc2">
+          <label>GRUPO A · TEXTURA</label>
+          <select id="texA">
+            <option value="smooth">Lisa</option>
+            <option value="suede">Ante</option>
+          </select>
+          <input id="colA" type="color" value="#E7BFC2">
         </div>
 
         <div class="row">
-          <label>GRUPO B · TEXTURA
-            <select id="texB">
-              <option value="smooth">Lisa</option>
-              <option value="suede">Ante</option>
-            </select>
-          </label>
-          <input id="colB" type="color" value="#8c5a45">
+          <label>GRUPO B · TEXTURA</label>
+          <select id="texB">
+            <option value="smooth">Lisa</option>
+            <option value="suede">Ante</option>
+          </select>
+          <input id="colB" type="color" value="#8C5A45">
         </div>
 
-        <div class="row">
+        <div class="row row--stitch">
           <label>COSTURA (C)</label>
-          <input id="stitchColor" type="color" value="#8c5a45">
+          <input id="stitchColor" type="color" value="#111111">
         </div>
 
-        <div class="row">
+        <div class="actions">
           <button id="dl">Descargar preview</button>
-          <button id="save" style="background:#fff">Ver JSON</button>
+          <button id="save" class="ghost">Ver JSON</button>
           <input type="hidden" id="spbc_config_json">
         </div>
       </div>
 
-      <div class="box stage">
-        <div id="stageBox" class="canvas-box">
-          <canvas id="cv"></canvas>
-        </div>
+      <!-- Escenario -->
+      <div class="stage">
+        <!-- Mantén 600x800 internos; el CSS lo hace responsive -->
+        <canvas id="cv" width="600" height="800"></canvas>
       </div>
     </div>
   </div>
