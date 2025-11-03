@@ -17,7 +17,7 @@
   const canvas=new fabric.Canvas('cv',{selection:false});
   canvas.setWidth(W); canvas.setHeight(H);
 
-  // Debug overlay
+  // Overlay debug
   const dbg=document.createElement('div');
   Object.assign(dbg.style,{position:'fixed',top:'8px',right:'8px',background:'rgba(0,0,0,.85)',color:'#fff',
     padding:'8px 10px',font:'12px/1.35 system-ui,Segoe UI,Roboto,Arial',borderRadius:'10px',zIndex:9999,maxWidth:'48ch'});
@@ -72,7 +72,7 @@
     const c=parseColor(o.fill);
     if(!c) return false;
     const a = c[3]==null?1:c[3];
-    return a>0.02; // transparente ≈ no visible
+    return a>0.02;
   }
 
   // Outline: sin fill visible + stroke gris/negro oscuro y fino
@@ -83,18 +83,67 @@
     return !hasVisibleFill(o) && dark && sw<=3;
   }
 
+  // RGB → HSV
+  function rgb2hsv([r,g,b]){
+    r/=255; g/=255; b/=255;
+    const max=Math.max(r,g,b), min=Math.min(r,g,b);
+    const d=max-min;
+    let h=0;
+    if(d!==0){
+      if(max===r) h=((g-b)/d)%6;
+      else if(max===g) h=(b-r)/d+2;
+      else h=(r-g)/d+4;
+      h*=60; if(h<0) h+=360;
+    }
+    const s = max===0?0:d/max;
+    const v = max;
+    return [h,s,v];
+  }
+
   // Color base para agrupar (fill si visible, si no stroke)
-  function baseColor(o){
+  function baseRGB(o){
     if(hasVisibleFill(o)){
       const c=parseColor(o.fill); return c? [c[0],c[1],c[2]] : null;
     }
     const s=('stroke' in o) ? parseColor(o.stroke) : null;
     return s? [s[0],s[1],s[2]] : null;
   }
-  function keyFromRGB(arr){ if(!arr) return null; const q=v=>Math.round(v/16)*16; const [r,g,b]=arr; return `rgb(${q(r)}, ${q(g)}, ${q(b)})`; }
+  function areaMetric(o){ return hasVisibleFill(o) ? bboxArea(o) : Math.max(1,(o.strokeWidth||1)*5); }
 
-  // Peso de área: si tiene fill visible -> bbox; si es solo stroke -> peso mínimo
-  function areaMetric(o){ return hasVisibleFill(o) ? bboxArea(o) : Math.max(1,(o.strokeWidth||1)*10); }
+  // HUE clustering (k=2)
+  function clusterByHue(objs){
+    const items = objs.map(o=>{
+      const rgb = baseRGB(o); if(!rgb) return null;
+      const [h,s,v]=rgb2hsv(rgb);
+      return {o,h,s,v,weight:areaMetric(o)};
+    }).filter(x=>x);
+
+    // filtrar grises/negros: poca saturación o valor muy bajo
+    const filt = items.filter(x=> (x.s>=0.25 && x.v>=0.35));
+    if(filt.length<6) return null; // no hay color suficiente
+
+    // semilla por extremos de hue
+    let h1=Math.min(...filt.map(x=>x.h)), h2=Math.max(...filt.map(x=>x.h));
+    for(let it=0; it<8; it++){
+      const A=[],B=[];
+      filt.forEach(x=>{
+        const d1=Math.min(Math.abs(x.h-h1),360-Math.abs(x.h-h1));
+        const d2=Math.min(Math.abs(x.h-h2),360-Math.abs(x.h-h2));
+        (d1<=d2?A:B).push(x);
+      });
+      const mean=(arr)=>arr.length? (arr.reduce((s,x)=>s+x.h*x.weight,0)/arr.reduce((s,x)=>s+x.weight,0)) : 0;
+      const n1=mean(A), n2=mean(B);
+      if(Math.abs(n1-h1)<0.5 && Math.abs(n2-h2)<0.5) break;
+      h1=n1; h2=n2;
+    }
+    const A=[],B=[];
+    filt.forEach(x=>{
+      const d1=Math.min(Math.abs(x.h-h1),360-Math.abs(x.h-h1));
+      const d2=Math.min(Math.abs(x.h-h2),360-Math.abs(x.h-h2));
+      (d1<=d2?A:B).push(x);
+    });
+    return {A:A.map(x=>x.o), B:B.map(x=>x.o), h1:Math.round(h1), h2:Math.round(h2), nA:A.length, nB:B.length};
+  }
 
   // centroid X
   function centerX(o){ const r=o.getBoundingRect(true,true); return r.left + r.width/2; }
@@ -128,45 +177,35 @@
   }
   function applyFill(o,material){ if('fill' in o) o.set('fill',material); else o.fill=material; }
 
-  // buckets
   function buildBuckets(root){
     const all = leafs(root).filter(o=>!isOutline(o));
 
-    // 1) ids si de verdad tienen contenido
+    // 1) IDs si tienen contenido real
     const ids=idsMap(root._objects?root._objects:[root]);
     if(ids['stripe1'] && ids['stripe2']){
       const A=leafs(ids['stripe1']).filter(o=>!isOutline(o));
       const B=leafs(ids['stripe2']).filter(o=>!isOutline(o));
-      const aArea=A.reduce((s,o)=>s+areaMetric(o),0), bArea=B.reduce((s,o)=>s+areaMetric(o),0);
-      if(A.length>=5 && B.length>=5 && aArea>800 && bArea>800){
+      if(A.length>=5 && B.length>=5){
         bucketA=A; bucketB=B; mode='ids';
-        dbg.innerHTML=`✅ SVG cargado (modo <b>ids</b>)<br>stripe1: ${A.length} objs<br>stripe2: ${B.length} objs`;
+        dbg.innerHTML=`✅ SVG cargado (modo <b>ids</b>)<br>stripe1: ${A.length} objs · stripe2: ${B.length} objs`;
         return;
       }
     }
 
-    // 2) auto-color (agrupa por color con pesos corregidos)
-    const byKey=new Map(), areaSum=new Map();
-    all.forEach(o=>{
-      const key=keyFromRGB(baseColor(o)); if(!key) return;
-      if(!byKey.has(key)){ byKey.set(key,[]); areaSum.set(key,0); }
-      byKey.get(key).push(o); areaSum.set(key, areaSum.get(key)+areaMetric(o));
-    });
-    const keys=[...byKey.keys()].sort((a,b)=>(areaSum.get(b)||0)-(areaSum.get(a)||0));
-    if(keys.length>=2){
-      bucketA=byKey.get(keys[0]); bucketB=byKey.get(keys[1]); mode='auto-color';
-      const info=keys.slice(0,2).map((k,i)=>`#${i+1} ${k} → ${byKey.get(k)?.length||0} objs, área≈${Math.round(areaSum.get(k)||0)}`).join('<br>');
-      dbg.innerHTML=`✅ SVG cargado (modo <b>auto-color</b>)<br>${info}`;
+    // 2) AUTO por HUE (ignora oscuros/grises)
+    const hueCluster = clusterByHue(all);
+    if(hueCluster){
+      bucketA=hueCluster.A; bucketB=hueCluster.B; mode='auto-color';
+      dbg.innerHTML=`✅ SVG cargado (modo <b>auto-color</b>)<br>Hue A≈${hueCluster.h1}° (${hueCluster.nA} objs) · Hue B≈${hueCluster.h2}° (${hueCluster.nB} objs)`;
       return;
     }
 
-    // 3) auto-geom (k=2 por X)
+    // 3) AUTO geométrico si no se detectaron colores válidos
     const [A,B]=kmeans2X(all);
     bucketA=A; bucketB=B; mode='auto-geom';
     dbg.innerHTML=`✅ SVG cargado (modo <b>auto-geom</b>)<br>A: ${A.length} objs · B: ${B.length} objs`;
   }
 
-  // pintado
   function paint(){
     const colA=ui.colA.value||'#e6e6e6', colB=ui.colB.value||'#c61a1a';
     const patA=tintPattern(ui.texA.value==='suede'?imgSuede:imgSmooth, colA);
