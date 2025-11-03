@@ -3,34 +3,27 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Tambour • Valonia (wizard)</title>
+  <title>Tambour • Wizard</title>
   <style>
-    :root{
-      --bg:#f6f6f6; --card:#ffffff; --ink:#0f0f0f;
-      --muted:#6b7280; --accent:#e11d48; --radius:14px;
-    }
-    html,body{height:100%}
+    :root{ --bg:#f6f6f6; --card:#fff; --muted:#6b7280; --radius:14px; }
+    *{ box-sizing:border-box }
+    html,body{ height:100% }
     body{
-      margin:0; font:16px/1.45 ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Arial;
-      background:var(--bg); color:#111;
-      display:flex; align-items:flex-start; justify-content:center;
+      margin:0; background:var(--bg);
+      font:16px/1.45 ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Arial;
+      display:flex; justify-content:center; align-items:flex-start;
     }
-    .wrap{width:min(1100px,100%); padding:18px}
-    .grid{display:grid; grid-template-columns: 1.4fr 1fr; gap:18px}
-    .card{
-      background:var(--card); border-radius:var(--radius);
-      box-shadow:0 1px 2px rgba(0,0,0,.05), 0 10px 30px rgba(0,0,0,.06);
-      border:1px solid #e5e7eb;
-    }
-    .stage{padding:18px}
-    canvas{width:100%; height:auto; display:block; border-radius:12px}
-
-    .panel{padding:18px}
-    h1{margin:0 0 4px 0; font-size:28px}
-    .sub{color:var(--muted); margin:0 0 18px 0}
-
-    .row{display:flex; align-items:center; justify-content:space-between; gap:10px; margin:12px 0}
-    .lbl{font-weight:600}
+    .wrap{ width:min(1100px,100%); padding:18px }
+    .grid{ display:grid; grid-template-columns:1.4fr 1fr; gap:18px }
+    .card{ background:var(--card); border:1px solid #e5e7eb; border-radius:var(--radius);
+           box-shadow:0 1px 2px rgba(0,0,0,.05), 0 10px 30px rgba(0,0,0,.06); }
+    .stage{ padding:18px }
+    canvas{ width:100%; height:auto; display:block; border-radius:12px }
+    .panel{ padding:18px }
+    h1{ margin:0 0 4px 0; font-size:28px }
+    .sub{ margin:0 0 18px 0; color:var(--muted) }
+    .row{ display:flex; align-items:center; justify-content:space-between; gap:10px; margin:12px 0 }
+    .lbl{ font-weight:600 }
     select{
       appearance:none; border:1px solid #e5e7eb; border-radius:12px;
       padding:8px 30px 8px 12px; background:#fff; font-weight:600;
@@ -39,32 +32,24 @@
       width:48px; height:36px; border-radius:10px; border:1px solid #e5e7eb; padding:0;
       appearance:none; background:#fff; cursor:pointer;
     }
-    .btn{
-      display:inline-flex; align-items:center; gap:8px;
-      padding:10px 14px; border-radius:12px; border:1px solid #e5e7eb; background:#fff;
-      font-weight:700; cursor:pointer;
-    }
-    .btn.primary{ background:#111; color:#fff; border-color:#111 }
-    .muted{color:var(--muted); font-size:14px}
+    .btn{ padding:10px 14px; border-radius:12px; border:1px solid #e5e7eb; background:#fff; font-weight:700; cursor:pointer }
+    .muted{ color:var(--muted); font-size:14px }
+    @media (max-width: 980px){ .grid{ grid-template-columns:1fr } }
   </style>
 </head>
 <body>
   <div class="wrap">
     <div class="grid">
-      <!-- Lienzo -->
       <div class="card stage">
         <canvas id="cv" width="800" height="900" aria-label="Vista previa del bolso"></canvas>
       </div>
-
-      <!-- Panel -->
       <div class="card panel">
         <h1>Tambour</h1>
         <p class="sub">2 colores · 2 texturas · contorno fijo.</p>
 
-        <!-- Grupo A -->
         <div class="row">
           <div class="lbl">Grupo A · Textura</div>
-          <div style="display:flex;gap:10px;align-items:center">
+          <div style="display:flex;gap:10px">
             <select id="texA" aria-label="Textura grupo A">
               <option value="smooth" selected>Lisa</option>
               <option value="suede">Ante</option>
@@ -73,10 +58,9 @@
           </div>
         </div>
 
-        <!-- Grupo B -->
         <div class="row">
           <div class="lbl">Grupo B · Textura</div>
-          <div style="display:flex;gap:10px;align-items:center">
+          <div style="display:flex;gap:10px">
             <select id="texB" aria-label="Textura grupo B">
               <option value="smooth" selected>Lisa</option>
               <option value="suede">Ante</option>
@@ -87,15 +71,13 @@
 
         <div class="row" style="margin-top:18px">
           <button id="dl" class="btn">Descargar preview</button>
-          <span class="muted">Pista: pulsa <b>D</b> para ver/ocultar debug.</span>
+          <span class="muted">Pulsa <b>D</b> para ver/ocultar debug.</span>
         </div>
       </div>
     </div>
   </div>
 
-  <!-- FabricJS -->
   <script src="https://cdn.jsdelivr.net/npm/fabric@5.3.0/dist/fabric.min.js"></script>
-  <!-- Lógica del wizard -->
   <script src="./customizer.js"></script>
 </body>
 </html>
