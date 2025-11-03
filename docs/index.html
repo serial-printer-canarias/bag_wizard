@@ -2,286 +2,86 @@
 <html lang="es">
 <head>
 <meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Bag Wizard (2 colores / 2 texturas + costura)</title>
-
-<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;600&family=Inter:wght@400;600&display=swap" rel="stylesheet">
-
 <style>
   :root{
-    --bg:#fafafa;
-    --line:#e9e9ec;
-    --terracotta:#8A5A44;   /* texto/acentos */
-    --pink:#E8C2C8;         /* botones y color A por defecto */
-    --ink:#3a3a3a;
-    --r-lg:16px; --r-md:12px;
+    --bg:#f7f7f9; --panel:#fff; --line:#e6e6e9;
+    --valonia-terracotta:#8C5A45;  /* texto */
+    --valonia-rose:#e7bfc2;        /* botones/chips */
   }
-
-  *{box-sizing:border-box}
-  html,body{min-height:100%; height:auto}
-  body{
-    margin:0; background:var(--bg); color:var(--ink);
-    font:400 15px/1.55 Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
-    -webkit-font-smoothing:antialiased; text-rendering:optimizeLegibility;
-    overflow-y:auto; -webkit-overflow-scrolling:touch;
+  body{margin:0;background:var(--bg);font:15px/1.45 system-ui,Segoe UI,Roboto,Arial,sans-serif;color:#222}
+  .wrap{max-width:1100px;margin:24px auto;padding:0 16px}
+  h1{font-size:28px;font-weight:400;letter-spacing:.02em;color:var(--valonia-terracotta);text-align:center;margin:0 0 18px}
+  .grid{display:grid;grid-template-columns:340px 1fr;gap:16px}
+  .box{background:var(--panel);border:1px solid var(--line);border-radius:12px}
+  .panel{padding:14px}
+  .stage{padding:10px}
+  .row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:6px 0}
+  label{display:inline-flex;align-items:center;gap:8px}
+  button{cursor:pointer;padding:10px 14px;border-radius:10px;border:1px solid var(--line);background:var(--valonia-rose);color:#5a3a2c;font-weight:600}
+  input[type="color"]{width:42px;height:42px;border-radius:12px;border:2px solid #eee}
+  /* Marco del canvas (limpio, 3:4) */
+  .canvas-box{
+    margin:0 auto; width:100%; max-width:720px;
+    border:1px dashed var(--line); border-radius:12px; background:#fff;
+    /* altura la pone JS; aquí solo reservamos algo para que no “salte” el layout */
+    min-height:300px;
   }
-
-  .wrap{max-width:1200px;margin:0 auto;padding:clamp(10px,3vw,20px)}
-
-  /* Logo inline (sustituye el <text> por tu SVG real si quieres) */
-  .brand{display:flex;justify-content:center;align-items:center;margin:6px 0 6px}
-  .logo-valonia{height:40px;display:block}
-  .logo-valonia *{vector-effect:non-scaling-stroke}
-
-  /* Título fino en terracota */
-  h1{
-    margin:6px 0 12px;
-    font:300 clamp(22px,3.6vw,36px)/1.1 "Cormorant Garamond", serif;
-    color:var(--terracotta); text-align:center; letter-spacing:.2px;
-  }
-
-  /* Layout */
-  .grid{
-    display:grid; gap:12px;
-    grid-template-columns:320px 1fr;
-    grid-template-areas:"controls stage";
-  }
-  .panel{grid-area:controls}
-  .stage{grid-area:stage}
+  #cv{display:block; width:100%; height:100%;}
   @media (max-width:980px){
-    .grid{grid-template-columns:1fr; grid-template-areas:"stage" "controls"}
+    .grid{grid-template-columns:1fr;gap:18px}
+    .canvas-box{max-width:680px}
   }
-
-  /* Tarjetas minimal */
-  .box{background:transparent;border:0;border-radius:var(--r-lg);box-shadow:none}
-  .panel{padding:10px}
-  .stage{display:flex;align-items:center;justify-content:center;padding:6px}
-
-  /* Controles */
-  .row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:10px 0}
-  label{display:inline-flex;align-items:center;gap:10px}
-  label span, label{
-    font:600 12px/1 Inter, sans-serif;
-    text-transform:uppercase; letter-spacing:.3px; color:var(--terracotta);
-  }
-  select, input[type="text"], input[type="number"]{
-    width:100%; border:1px solid var(--line); border-radius:var(--r-md);
-    padding:9px 11px; background:#fff; outline:none;
-  }
-  select:focus, input:focus{border-color:var(--terracotta); box-shadow:0 0 0 3px rgba(138,90,68,.12)}
-  input[type="color"]{
-    appearance:none; border:none; width:34px; height:34px; padding:0;
-    border-radius:12px; overflow:hidden; background:none;
-    box-shadow:inset 0 0 0 1px rgba(0,0,0,.08); cursor:pointer;
-  }
-
-  /* Botones */
-  button{
-    cursor:pointer; padding:10px 16px; border-radius:12px;
-    border:1px solid var(--line); background:#fff;
-    font:600 14px/1 Inter, sans-serif; color:var(--terracotta);
-    transition:transform .02s ease;
-  }
-  #dl{ background:var(--pink); border-color:transparent; color:var(--terracotta) }
-  button:hover{transform:translateY(-1px)}
-
-  /* ===== PREVIEW: marco 3:4 para evitar deformación ===== */
-  .cv-frame{
-    width: clamp(260px, 40vw, 420px);  /* desktop */
-    aspect-ratio: 3 / 4;               /* 600x800 */
-    border:1px solid var(--line);
-    border-radius:14px;
-    background:#fff;
-    overflow:hidden;
-    margin:0 auto;
-  }
-  @media (max-width:980px){
-    .cv-frame{
-      width: min(86vw, calc(48vh * .75)); /* móvil, manteniendo 3:4 */
-      aspect-ratio: 3 / 4;
-    }
-  }
-  /* El canvas rellena el marco (tamaño visual = tamaño backstore) */
-  #cv{ width:100% !important; height:100% !important; display:block; }
 </style>
 </head>
 <body>
   <div class="wrap">
-    <div class="brand">
-      <svg class="logo-valonia" viewBox="0 0 200 40" xmlns="http://www.w3.org/2000/svg" aria-label="Valonia" fill="none" stroke="currentColor" stroke-width="1.2" style="color:#8A5A44">
-        <text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" font-family="Cormorant Garamond, serif" font-size="16" fill="#8A5A44">VALONIA</text>
-      </svg>
-    </div>
-
     <h1>Diseña tu Tambour</h1>
 
     <div class="grid">
       <div class="box panel">
         <div class="row">
-          <label><span>Grupo A · Textura</span>
+          <label>GRUPO A · TEXTURA
             <select id="texA">
               <option value="smooth">Lisa</option>
               <option value="suede">Ante</option>
             </select>
           </label>
-          <input id="colA" type="color" value="#E8C2C8">
+          <input id="colA" type="color" value="#e7bfc2">
         </div>
 
         <div class="row">
-          <label><span>Grupo B · Textura</span>
+          <label>GRUPO B · TEXTURA
             <select id="texB">
               <option value="smooth">Lisa</option>
               <option value="suede">Ante</option>
             </select>
           </label>
-          <input id="colB" type="color" value="#8A5A44">
+          <input id="colB" type="color" value="#8c5a45">
         </div>
 
         <div class="row">
-          <label><span>Costura (C)</span></label>
-          <input id="stitchColor" type="color" value="#8A5A44">
+          <label>COSTURA (C)</label>
+          <input id="stitchColor" type="color" value="#8c5a45">
         </div>
 
         <div class="row">
           <button id="dl">Descargar preview</button>
-          <button id="save">Ver JSON</button>
+          <button id="save" style="background:#fff">Ver JSON</button>
           <input type="hidden" id="spbc_config_json">
         </div>
       </div>
 
       <div class="box stage">
-        <div class="cv-frame">
-          <!-- Mantén 600x800; el JS ajusta zoom/centro -->
-          <canvas id="cv" width="600" height="800"></canvas>
+        <div id="stageBox" class="canvas-box">
+          <canvas id="cv"></canvas>
         </div>
       </div>
     </div>
   </div>
 
-  <!-- Librerías originales -->
   <script src="https://cdn.jsdelivr.net/npm/fabric@5.3.0/dist/fabric.min.js"></script>
   <script src="js/customizer.js"></script>
-
-  <!-- 🔧 ENCAJE DURO: tras cada "add" de Fabric y en resize -->
-  <script>
-  (function(){
-    const el = document.getElementById('cv');
-
-    // 1) Hook a 'add' para encajar después de que tu JS meta el SVG
-    const _add = fabric.Canvas.prototype.add;
-    fabric.Canvas.prototype.add = function(){
-      const r = _add.apply(this, arguments);
-      scheduleFit(this);
-      return r;
-    };
-
-    // 2) Utilidades
-    function findCanvas(){
-      // Preferimos la instancia cuyo lowerCanvasEl es #cv
-      const candidates = [window.canvas, window.cv, el.__canvas, el.fabric, el._fabric, el._canvas, el.canvas];
-      for (const c of candidates) if (c && c.lowerCanvasEl === el) return c;
-      // Scan por si la guardan con otro nombre
-      for (const k in window){
-        try{
-          const v = window[k];
-          if (v && v.lowerCanvasEl === el && typeof v.getObjects === 'function') return v;
-        }catch(e){}
-      }
-      return null;
-    }
-
-    function sizeBackstoreToFrame(){
-      const frame = el.parentElement;
-      const w = Math.max(1, frame.clientWidth);
-      const h = Math.max(1, frame.clientHeight);
-      const c = findCanvas();
-      if (c && typeof c.setDimensions === 'function'){
-        c.setDimensions({ width:w, height:h }, { backstoreOnly:false });
-      } else {
-        el.width = w; el.height = h; el.style.width = w+'px'; el.style.height = h+'px';
-      }
-    }
-
-    function getWorldBounds(c){
-      const objs = c.getObjects().filter(o => o && o.visible !== false);
-      if (!objs.length) return null;
-      // Medimos sin viewport transform para evitar recortes raros
-      const old = c.viewportTransform ? c.viewportTransform.slice() : [1,0,0,1,0,0];
-      c.setViewportTransform([1,0,0,1,0,0]);
-      c.renderAll();
-
-      let minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;
-      for (const o of objs){
-        o.setCoords();
-        const a = o.aCoords;
-        minX = Math.min(minX, a.tl.x, a.tr.x, a.bl.x, a.br.x);
-        minY = Math.min(minY, a.tl.y, a.tr.y, a.bl.y, a.br.y);
-        maxX = Math.max(maxX, a.tl.x, a.tr.x, a.bl.x, a.br.x);
-        maxY = Math.max(maxY, a.tl.y, a.tr.y, a.bl.y, a.br.y);
-      }
-      c.setViewportTransform(old);
-      return { w:maxX-minX, h:maxY-minY, cx:minX + (maxX-minX)/2, cy:minY + (maxY-minY)/2 };
-    }
-
-    let raf, lastW=0, lastH=0;
-    function scheduleFit(c){
-      if (raf) cancelAnimationFrame(raf);
-      raf = requestAnimationFrame(()=>fitAll(c || findCanvas()));
-    }
-
-    function fitAll(c){
-      if (!c) return;
-      // 1) sincronizar tamaño interno con el marco visual
-      sizeBackstoreToFrame();
-
-      // 2) calcular bounds "reales" de todo el bolso
-      const b = getWorldBounds(c);
-      if (!b || b.w<=0 || b.h<=0) return;
-
-      const pad = 18;
-      const cw = c.getWidth()  - pad*2;
-      const ch = c.getHeight() - pad*2;
-
-      // 3) zoom para encajar completo
-      const zoom = Math.min(cw / b.w, ch / b.h);
-
-      // 4) centro del canvas y del contenido
-      const cx = c.getWidth()/2, cy = c.getHeight()/2;
-
-      // 5) aplicar viewport transform (zoom + translate)
-      c.setViewportTransform([zoom,0,0,zoom, cx - b.cx*zoom, cy - b.cy*zoom ]);
-      c.requestRenderAll();
-
-      lastW = c.getWidth(); lastH = c.getHeight();
-    }
-
-    // Bootstrap cuando la página y tu wizard terminan de crear el canvas
-    window.addEventListener('load', ()=>{
-      // varios intentos porque el SVG carga asíncrono
-      let tries = 0;
-      const ticker = setInterval(()=>{
-        const c = findCanvas();
-        if (c && c.getObjects().length){
-          clearInterval(ticker);
-          // encaje inicial + unos reajustes rápidos al principio
-          fitAll(c);
-          let n=0; const k = setInterval(()=>{ fitAll(c); if(++n>8) clearInterval(k); }, 180);
-
-          // escucha cambios del propio Fabric
-          c.on && c.on('object:added',    ()=>scheduleFit(c));
-          c.on && c.on('object:modified', ()=>scheduleFit(c));
-          c.on && c.on('after:render',    ()=>{
-            // si el backstore cambió de tamaño (rotación, barra superior iOS, etc.), reencaja
-            if (c.getWidth()!==lastW || c.getHeight()!==lastH) scheduleFit(c);
-          });
-        }
-        if (++tries>60) clearInterval(ticker); // ~12s
-      }, 200);
-    });
-
-    // Reencajar en rotaciones/resize
-    window.addEventListener('resize', ()=>scheduleFit(findCanvas()));
-  })();
-  </script>
 </body>
 </html>
