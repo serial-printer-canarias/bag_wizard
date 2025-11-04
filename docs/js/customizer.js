@@ -30,11 +30,24 @@
 
   // ---------- helpers ----------
   function fit(g){
-    const m=24,maxW=W-2*m,maxH=H-2*m;
-    const w=g.width||g.getScaledWidth(),h=g.height||g.getScaledHeight();
-    const s=Math.min(maxW/w,maxH/h);
+    // Más aire para que el bolso se vea siempre entero y más pequeño de inicio
+    const M = Math.max(36, Math.round(Math.min(W, H) * 0.10)); // ~10% del canvas
+    const maxW = W - 2*M, maxH = H - 2*M;
+
+    const w = g.width || g.getScaledWidth();
+    const h = g.height || g.getScaledHeight();
+
+    const base = Math.min(maxW / w, maxH / h);
+    const EXTRA = 0.82;                    // encoge ~18% adicional (≈15–20%)
+    const s = base * EXTRA;
+
     g.scale(s);
-    g.set({left:(W-w*s)/2,top:(H-h*s)/2,selectable:false,evented:false});
+    g.set({
+      left:(W - w*s)/2,
+      top: (H - h*s)/2,
+      selectable:false,
+      evented:false
+    });
   }
   function walk(arr,fn){ (function rec(a){ a.forEach(o=>{ fn(o); if(o._objects&&o._objects.length) rec(o._objects); }); })(arr); }
   function leafs(root){ const out=[]; walk([root], o=>{ if(o._objects&&o._objects.length) return; if(o.type==='image') return; out.push(o); }); return out; }
@@ -321,33 +334,15 @@
     const data=canvas.toDataURL({format:'png',multiplier:1.5});
     const a=document.createElement('a'); a.href=data; a.download='bolso-preview.png'; a.click();
   });
-
-  /* ← guardia para no romper si “Ver JSON” no existe */
-  if(ui.save){
-    ui.save.addEventListener('click', ()=>{
-      ui.hidden.value = JSON.stringify({
-        model:'bucket-01',
-        mode,
-        A:{ texture: ui.texA.value, color: ui.colA.value },
-        B:{ texture: ui.texB.value, color: ui.colB.value },
-        C:{ texture:'none', color: ui.stitch ? ui.stitch.value : '#111111' },
-        version:'1.0.1'
-      });
-      alert(ui.hidden.value);
-    });
-  }
-  
-    // --- Exponer snapshot para el formulario (no altera la lógica) ---
-  window.getWizardSnapshot = function(){
-    const cfg = {
+  ui.save.addEventListener('click', ()=>{
+    ui.hidden.value = JSON.stringify({
       model:'bucket-01',
       mode,
       A:{ texture: ui.texA.value, color: ui.colA.value },
       B:{ texture: ui.texB.value, color: ui.colB.value },
       C:{ texture:'none', color: ui.stitch ? ui.stitch.value : '#111111' },
       version:'1.0.1'
-    };
-    const png = canvas.toDataURL({ format:'png', multiplier: 1.5 });
-    return { png, config: cfg };
-  };
+    });
+    alert(ui.hidden.value);
+  });
 })();
