@@ -1,0 +1,12 @@
+{
+  "name": "Valonia · Bag Wizard",
+  "short_name": "Valonia",
+  "start_url": ".",
+  "scope": ".",
+  "display": "standalone",
+  "background_color": "#f7f5f2",
+  "theme_color": "#7b4b3e",
+  "icons": [
+    { "src": "assets/logo/valonia-mark.png", "sizes": "256x256", "type": "image/png", "purpose": "any maskable" }
+  ]
+}
