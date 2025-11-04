@@ -9,10 +9,10 @@
   :root{
     --bg:#f7f7f9; --ink:#221E1B; --terra:#8C5A45; --rose:#E7BFC2; --line:#eaeaea;
     --rightCol: 420px;
-    --gap-logo-title: 40px;   /* aire logo ↔ título */
+    --gap-logo-title: 44px;   /* aire logo ↔ título */
     --gap-title-options: 16px;/* título ↔ opciones */
-    --desk-gap: 8px;          /* columnas MÁS cerca */
-    --nudge-left: -56px;      /* empuja bloque hacia el bolso/centro */
+    --desk-gap: 0px;          /* columnas sin separación visual */
+    --nudge-left: clamp(-160px, -10vw, -100px); /* EMPUJE fuerte hacia el bolso */
     --m-gap: 22px;
   }
 
@@ -33,15 +33,15 @@
     align-items:start;
   }
 
-  /* Canvas: ~15% más pequeño */
+  /* Canvas MUY pequeño para que quepa entero sin scroll */
   .stage{display:flex;justify-content:flex-start;align-items:flex-start}
   #cv{
     display:block;background:transparent;border:none;border-radius:0;
-    width:clamp(260px, 34vw, 510px); /* ↓ antes ~40vw/600 */
+    width:clamp(240px, 30vw, 470px); /* ← más pequeño que antes */
     height:auto;margin-top:4px;
   }
 
-  /* Bloque derecho compacto, centrado entre sí y más pegado al bolso */
+  /* Bloque derecho compacto, centrado entre sí y pegado al bolso */
   .side{
     display:flex;flex-direction:column;align-items:center;text-align:center;
     gap:var(--gap-title-options);align-self:center;margin-left:var(--nudge-left);
@@ -68,7 +68,7 @@
   .actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:6px}
   button{cursor:pointer;border-radius:12px;padding:9px 14px;font-weight:600;border:1px solid var(--line);background:var(--rose);color:#5a3a2c}
 
-  /* Formulario */
+  /* Formulario limpio */
   .order{max-width:980px;margin:40px auto 0;background:transparent;border:none;padding:0}
   .order h2{
     margin:0 0 20px 0;
@@ -82,10 +82,10 @@
   .order textarea{min-height:124px;resize:vertical}
   .small{font-size:12px;color:#7a7a7a}
 
-  /* Móvil: centrado y separado por bloques */
+  /* Móvil: centrado y ordenado por bloques */
   @media (max-width:980px){
     .grid{grid-template-columns:1fr;gap:var(--m-gap);justify-items:center}
-    #cv{width:min(92vw,520px)}
+    #cv{width:min(92vw,480px)}
     .side{gap:22px;margin-left:0}
     .brand{gap:26px}
     .order{margin:34px 16px 0}
