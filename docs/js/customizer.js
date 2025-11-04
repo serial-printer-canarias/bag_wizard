@@ -30,24 +30,30 @@
 
   // ---------- helpers ----------
   function fit(g){
-    // Ajuste fino del "ancho": usamos boundingRect real y subimos FILL.
+    // SOLO ajuste de ANCHO del SVG a “tamaño normal”, manteniendo proporción.
     const isMob = window.matchMedia('(max-width: 768px)').matches;
-    const PAD       = isMob ? 18 : 22;       // margen
-    const FILL_MOB  = 0.94;                  // ocupar más ancho en móvil
-    const FILL_DESK = 0.96;                  // ocupar más ancho en desktop
-    const FILL = isMob ? FILL_MOB : FILL_DESK;
+    const PAD = isMob ? 18 : 22;                        // margen interno
+    const TARGET_W_RATIO_DESK = 0.44;                   // % del ancho útil que ocupa el bolso en desktop
+    const TARGET_W_RATIO_MOB  = 0.52;                   // % en móvil
+    const targetRatio = isMob ? TARGET_W_RATIO_MOB : TARGET_W_RATIO_DESK;
 
     const maxW = W - 2*PAD;
     const maxH = H - 2*PAD;
 
-    // reset a escala 1 para medir bien
+    // Reset para medir bien
     g.set({ scaleX:1, scaleY:1, left:0, top:0 });
-    // medir con boundingRect para coger ancho/alto reales
     const r0 = g.getBoundingRect(true, true);
-    const w = r0.width > 0 ? r0.width : (g.width || 1);
-    const h = r0.height> 0 ? r0.height: (g.height|| 1);
+    const w = Math.max(1, r0.width);
+    const h = Math.max(1, r0.height);
 
-    const s = Math.min(maxW/w, maxH/h) * FILL;
+    // Escala definida por ANCHO deseado
+    const desiredWidth = maxW * targetRatio;
+    let s = desiredWidth / w;
+
+    // Salvaguarda por si la altura se sale
+    if (h * s > maxH) {
+      s = (maxH / h) * 0.98; // un pelín de aire
+    }
 
     g.scale(s);
     g.set({
