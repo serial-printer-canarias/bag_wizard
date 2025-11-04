@@ -10,6 +10,7 @@
   const ui={
     texA:$('#texA'), colA:$('#colA'),
     texB:$('#texB'), colB:$('#colB'),
+    // --- Grupo C (costura) ---
     stitch: $('#stitchColor'),
     dl:$('#dl'), save:$('#save'), hidden:$('#spbc_config_json')
   };
@@ -24,8 +25,12 @@
     padding:'8px 10px',font:'12px/1.35 system-ui,Segoe UI,Roboto,Arial',borderRadius:'10px',zIndex:9999,maxWidth:'48ch'});
   dbg.textContent='Cargando…'; document.body.appendChild(dbg);
 
-  let mode=''; let bucketA=[], bucketB=[];
-  let outlineSet=new Set(); let stitchSet=new Set();
+  let mode=''; // 'ids' | 'auto-mix' | 'auto-geom'
+  let bucketA=[], bucketB=[];
+  let outlineSet=new Set(); // hojas que son contorno/detalle
+  // --- Grupo C (costura) ---
+  let stitchSet=new Set();
+
   let imgSmooth=null, imgSuede=null;
 
   // ---------- helpers ----------
@@ -80,6 +85,7 @@
   }
   function hasStroke(o){ return ('stroke' in o) && o.stroke && o.stroke!=='none'; }
 
+  // Heurística de contorno:
   function isOutlineStroke(o){
     if(hasVisibleFill(o)) return false;
     if(!hasStroke(o)) return false;
@@ -91,7 +97,7 @@
     if(!hasVisibleFill(o)) return false;
     const rgb=parseColor(o.fill);
     if(!rgb) return false;
-    if(!(nearGray(rgb,28) && luma(rgb)<90)) return false;
+    if(!(nearGray(rgb,28) && luma(rgb)<90)) return false; // oscuro
     const a=bboxArea(o);
     return a <= areaRoot*0.02;
   }
@@ -180,7 +186,7 @@
   }
   const applyFill=(o,mat)=>{ if('fill' in o) o.set('fill',mat); else o.fill=mat; };
 
-  // --------- OUTLINE ----------
+  // --------- OUTLINE: detectar y fijar estilo ----------
   function styleAndCollectOutlines(root){
     outlineSet=new Set();
     const areaRoot = (root.getScaledWidth?.()||getW(root)) * (root.getScaledHeight?.()||getH(root)) || (W*H);
@@ -215,7 +221,7 @@
     });
   }
 
-  // --------- COSTURA ----------
+  // --------- STITCH: detectar grupo de costura (C) y fijar estilo base ----------
   function collectStitch(root){
     stitchSet = new Set();
     const ids=idsMap(root._objects?root._objects:[root]);
@@ -225,23 +231,28 @@
     const leaves = leafs(gStitch);
     leaves.forEach(o=>{
       stitchSet.add(o);
+      // estilo base de puntada (solo trazo)
       o.set({
-        fill:'none',
-        stroke: ui.stitch?.value || '#111111',
+        fill: 'none',
+        stroke: ui.stitch?.value || '#2a2a2a',
         strokeWidth: 1.4,
-        strokeLineCap:'round', strokeLineJoin:'round',
-        strokeUniform:true, opacity:1
+        strokeLineCap: 'round',
+        strokeLineJoin: 'round',
+        strokeUniform: true,
+        opacity: 1
       });
       if(o.group) bringChildToTop(o.group,o);
     });
     const parent = gStitch.group || root; bringChildToTop(parent, gStitch);
   }
 
-  // --------- BUCKETS ----------
+  // --------- buckets pintables ----------
   function buildBuckets(root){
     const allLeaves = leafs(root);
+    // NO pintar outline ni costura
     const paintables = allLeaves.filter(o=>!outlineSet.has(o) && !stitchSet.has(o));
 
+    // 1) ids stripe1/stripe2
     const ids=idsMap(root._objects?root._objects:[root]);
     if(ids['stripe1'] && ids['stripe2']){
       const A=leafs(ids['stripe1']).filter(o=>!outlineSet.has(o) && !stitchSet.has(o));
@@ -253,6 +264,7 @@
       }
     }
 
+    // 2) color+posición
     const mix=kmeans2_mix(paintables);
     if(mix.A.length && mix.B.length){
       bucketA=mix.A; bucketB=mix.B; mode='auto-mix';
@@ -260,12 +272,13 @@
       return;
     }
 
+    // 3) geom por X
     const [AX,BX]=kmeans2X(paintables);
     bucketA=AX; bucketB=BX; mode='auto-geom';
     dbg.innerHTML=`✅ SVG cargado (modo <b>auto-geom</b>) · A: ${AX.length} · B: ${BX.length} · stitch: ${stitchSet.size} · outline: ${outlineSet.size}`;
   }
 
-  // --------- PINTADO ----------
+  // --------- pintado ----------
   function paint(){
     const colA=ui.colA.value||'#e6e6e6', colB=ui.colB.value||'#c61a1a';
     const patA=tintPattern(ui.texA.value==='suede'?imgSuede:imgSmooth, colA);
@@ -274,6 +287,7 @@
     bucketA.forEach(o=>{ applyFill(o, patA); o.dirty=true; });
     bucketB.forEach(o=>{ applyFill(o, patB); o.dirty=true; });
 
+    // reafirmar contorno encima y negro
     outlineSet.forEach(o=>{
       if(hasStroke(o) || !hasVisibleFill(o)){
         o.set({fill:'none', stroke:'#111'});
@@ -284,8 +298,9 @@
       o.dirty=true;
     });
 
+    // --- pintar costura (C) como color liso de trazo ---
     if(ui.stitch){
-      const sc = ui.stitch.value || '#111111';
+      const sc = ui.stitch.value || '#2a2a2a';
       stitchSet.forEach(o=>{
         o.set({ fill:'none', stroke: sc, opacity:1 });
         if(o.group) bringChildToTop(o.group,o);
@@ -302,8 +317,11 @@
     const root=fabric.util.groupSVGElements(objs,opts);
     fit(root); canvas.add(root);
 
+    // --- nuevo: detectar y configurar costura (C) ---
     collectStitch(root);
+    // existente: contornos
     styleAndCollectOutlines(root);
+    // buckets A/B (excluyen outline y costura)
     buildBuckets(root);
     paint();
   },(item,obj)=>{ obj.selectable=false; });
@@ -314,26 +332,23 @@
     ui.colB.addEventListener(ev, paint);
     ui.texA.addEventListener(ev, paint);
     ui.texB.addEventListener(ev, paint);
-    if(ui.stitch) ui.stitch.addEventListener(ev, paint);
+    if(ui.stitch) ui.stitch.addEventListener(ev, paint); // Grupo C
   });
 
   ui.dl.addEventListener('click', ()=>{
     const data=canvas.toDataURL({format:'png',multiplier:1.5});
     const a=document.createElement('a'); a.href=data; a.download='bolso-preview.png'; a.click();
   });
-
-  /* ← guardia para no romper si “Ver JSON” no existe */
-  if(ui.save){
-    ui.save.addEventListener('click', ()=>{
-      ui.hidden.value = JSON.stringify({
-        model:'bucket-01',
-        mode,
-        A:{ texture: ui.texA.value, color: ui.colA.value },
-        B:{ texture: ui.texB.value, color: ui.colB.value },
-        C:{ texture:'none', color: ui.stitch ? ui.stitch.value : '#111111' },
-        version:'1.0.1'
-      });
-      alert(ui.hidden.value);
+  ui.save.addEventListener('click', ()=>{
+    ui.hidden.value = JSON.stringify({
+      model:'bucket-01',
+      mode,
+      A:{ texture: ui.texA.value, color: ui.colA.value },
+      B:{ texture: ui.texB.value, color: ui.colB.value },
+      // Grupo C (costura)
+      C:{ texture:'none', color: ui.stitch ? ui.stitch.value : '#2a2a2a' },
+      version:'1.0.1'
     });
-  }
+    alert(ui.hidden.value);
+  });
 })();
