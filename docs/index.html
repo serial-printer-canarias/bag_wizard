@@ -9,126 +9,94 @@
   :root{
     --bg:#f7f6f4;
     --ink:#1e1b19;
-    --terracotta:#8e5f49;    /* texto principal */
-    --rose:#e8bebf;           /* botones */
+    --terracotta:#8e5f49;
+    --rose:#e8bebf;
     --line:#e7e2dd;
   }
 
-  /* Tipografías */
+  /* Base */
   html,body{height:100%}
   body{
-    margin:0;
-    background:var(--bg);
-    color:var(--ink);
+    margin:0; background:var(--bg); color:var(--ink);
     font:15px/1.45 system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
   }
-  h1,h2,label,legend{
+  h1,h2,label,legend,small{
     font-family: Didot,"Bodoni Moda","Playfair Display","Times New Roman",serif;
-    letter-spacing:.2px;
-    color:var(--terracotta);
+    letter-spacing:.2px; color:var(--terracotta);
   }
 
+  /* Layout 2 columnas */
   .wrap{
-    max-width:1200px;
-    margin:24px auto 56px;
-    padding:0 18px;
-    display:grid;
-    grid-template-columns: minmax(420px, 58%) minmax(320px, 1fr);
-    gap:28px;
-    align-items:start;
+    max-width:1200px; margin:22px auto 56px; padding:0 18px;
+    display:grid; grid-template-columns: minmax(420px,58%) minmax(320px,1fr);
+    gap:28px; align-items:start;
   }
 
-  /* Columna izquierda: lienzo del bolso */
-  .stage{
-    margin-top:6px;                 /* más arriba como pediste */
-    border-radius:14px;
-    background:transparent;         /* sin caja blanca */
-    display:flex;
-    align-items:flex-start;         /* pegue arriba */
-    justify-content:center;
-    padding:0;                      /* limpio */
-    min-height: 0;
-  }
-  #cv{
-    display:block;
-    width:600px; height:800px;      /* tamaño lógico base (el customizer ajusta escala) */
-    border:0;                       /* nada de bordes ni dash */
-    background:transparent;
-  }
+  /* Lienzo (sin blancos) */
+  .stage{display:flex; align-items:flex-start; justify-content:center}
+  #cv{display:block; width:600px; height:800px; border:0; background:transparent}
 
-  /* Columna derecha: logo + título + controles en bloque */
-  .sidebar{
-    display:flex;
-    flex-direction:column;
-    align-items:center;
-    gap:18px;
-  }
-  .logo{
-    width:120px; height:auto;
-    display:block;
-    opacity:.95;
-    margin-top:4px;
-  }
-  .title{
-    margin:0;
-    font-size:28px;
-    font-weight:400;
-  }
+  /* Bloque derecho = logo + título + controles (todo junto) */
+  .sidebar{display:flex; flex-direction:column; align-items:center; gap:16px}
+  .logo{width:140px;height:auto;display:block;opacity:.95;margin-top:2px}
+  .title{margin:0; font-size:28px; font-weight:400}
+  .controls{width:320px; display:flex; flex-direction:column; gap:12px}
 
-  .controls{
-    width: 320px;                   /* bloque estrecho, centrado */
-    display:flex; flex-direction:column; gap:12px;
-  }
-  .row{display:flex; align-items:center; justify-content:space-between; gap:12px}
-  .row small{font-family:Didot,"Bodoni Moda","Playfair Display","Times New Roman",serif; color:var(--terracotta); opacity:.9}
+  /* Filas sin paneles blancos */
+  .row{display:flex; align-items:center; justify-content:space-between; gap:12px; background:transparent}
+  .row small{opacity:.95}
+
+  /* Select minimal: SIN FONDO BLANCO */
   select{
-    width:140px; padding:8px 10px; border:1px solid var(--line); border-radius:10px; background:#fff;
-  }
-  .chip{
-    width:34px; height:34px; border-radius:50%;
-    display:inline-block; border:1px solid var(--line); box-shadow:0 1px 0 #0000000e inset;
-  }
-  #colA{background:#e8c0c0}
-  #colB{background:#8c5b46}
-  input[type="color"]{ /* ocultar color-picker por defecto y usar chip */
-    appearance: none; border:0; padding:0; width:0; height:0; position:absolute; left:-9999px;
+    width:140px; padding:8px 10px;
+    border:1px solid var(--line); border-radius:10px;
+    background:transparent; color:#5c4a40;
+    -webkit-appearance:none; -moz-appearance:none; appearance:none;
+    background-image:
+      linear-gradient(45deg, transparent 50%, #b99b8c 50%),
+      linear-gradient(135deg, #b99b8c 50%, transparent 50%);
+    background-position:
+      calc(100% - 18px) 50%,
+      calc(100% - 12px) 50%;
+    background-size:6px 6px, 6px 6px;
+    background-repeat:no-repeat;
   }
 
+  /* Chips color */
+  .chip{width:34px; height:34px; border-radius:50%;
+    display:inline-block; border:1px solid var(--line); box-shadow:0 1px 0 #0000000e inset}
+  #colA,#colB{position:absolute; left:-9999px; width:0; height:0; border:0; padding:0}
+
+  /* Botón Valonia */
   button{
-    cursor:pointer;
-    padding:10px 14px;
-    border-radius:12px;
-    border:1px solid var(--line);
-    background:var(--rose);
-    color:#4b2f26;
-    font-weight:500;
+    cursor:pointer; padding:10px 14px; border-radius:12px;
+    border:1px solid var(--line); background:var(--rose); color:#4b2f26; font-weight:500
   }
 
-  /* Formulario (debajo, sin cajas blancas) */
-  .form-wrap{
-    max-width:1200px; margin:40px auto 80px; padding:0 18px;
-  }
+  /* Formulario limpio, con aire, sin “cajas” */
+  .form-wrap{max-width:1200px; margin:40px auto 80px; padding:0 18px}
   .form-wrap h2{margin:0 0 14px; font-size:20px; font-weight:400}
-  form{display:grid; grid-template-columns: 1fr 1fr; gap:12px 18px}
+  form{display:grid; grid-template-columns: 1fr 1fr; gap:14px 18px}
   form .span2{grid-column:1 / -1}
   input,textarea{
-    width:100%; padding:10px 12px; border:1px solid var(--line);
-    border-radius:10px; background:#fff; font:inherit;
+    width:100%; padding:10px 12px;
+    border:1px solid var(--line); border-radius:10px;
+    background:transparent;  /* <<< sin blanco */
+    font:inherit; color:var(--ink)
   }
   textarea{min-height:108px; resize:vertical}
+  ::placeholder{color:#a7958a}
+
   .privacy{display:flex; align-items:center; gap:8px; color:#6b5a50}
 
-  /* Móvil: todo centrado y en columna */
+  /* Móvil todo centrado */
   @media (max-width: 900px){
-    .wrap{
-      grid-template-columns: 1fr;
-      gap:22px;
-    }
+    .wrap{grid-template-columns:1fr; gap:22px}
     .stage{justify-content:center}
-    #cv{width:92vw; height: calc(92vw * 4 / 3);} /* proporción base 3:4 aprox; el customizer reescala internamente */
+    #cv{width:92vw; height: calc(92vw * 4 / 3)}
     .sidebar{align-items:center}
     .controls{width:min(92vw,380px)}
-    .logo{width:110px}
+    .logo{width:120px}
     .title{font-size:26px}
     form{grid-template-columns:1fr}
   }
@@ -137,19 +105,17 @@
 <body>
 
   <div class="wrap">
-    <!-- Columna izquierda: CANVAS -->
+    <!-- Lienzo izquierda -->
     <div class="stage">
       <canvas id="cv" width="600" height="800"></canvas>
     </div>
 
-    <!-- Columna derecha: LOGO + TÍTULO + CONTROLES (bloque centrado) -->
+    <!-- Bloque derecho (logo + título + controles) -->
     <aside class="sidebar">
-      <img class="logo" src="assets/logo-valonia.svg"
-           onerror="this.src='assets/logo-valonia.png'" alt="Valonia" />
+      <img class="logo" src="assets/logo-valonia.svg" onerror="this.src='assets/logo-valonia.png'" alt="Valonia" />
       <h1 class="title">Diseña tu Tambour</h1>
 
       <div class="controls">
-        <!-- 1º cuero -->
         <div class="row">
           <small>1º&nbsp;CUERO · TEXTURA</small>
           <select id="texA">
@@ -160,7 +126,6 @@
           <input id="colA" type="color" value="#e8c0c0">
         </div>
 
-        <!-- 2º cuero -->
         <div class="row">
           <small>2º&nbsp;CUERO · TEXTURA</small>
           <select id="texB">
@@ -179,25 +144,25 @@
     </aside>
   </div>
 
-  <!-- FORMULARIO (limpio, sin cajas) -->
+  <!-- FORMULARIO (limpio, sin recuadros) -->
   <section class="form-wrap">
     <h2>Datos para tu pedido</h2>
     <form id="orderForm">
       <div>
         <label>Nombre y apellidos</label>
-        <input name="nombre" required>
+        <input name="nombre" placeholder="Tu nombre" required>
       </div>
       <div>
         <label>Email</label>
-        <input name="email" type="email" required>
+        <input name="email" type="email" placeholder="tucorreo@dominio.com" required>
       </div>
       <div>
         <label>Teléfono</label>
-        <input name="telefono" inputmode="tel">
+        <input name="telefono" inputmode="tel" placeholder="+34 …">
       </div>
       <div>
         <label>Referencia de pedido (opcional)</label>
-        <input name="ref">
+        <input name="ref" placeholder="Ej.: TIENDA-1234">
       </div>
       <div class="span2">
         <label>Notas</label>
@@ -221,37 +186,29 @@
   <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 
   <script>
-    // chips visuales sincronizados con los color-pickers
-    const chipA = document.getElementById('chipA');
-    const chipB = document.getElementById('chipB');
-    const colA  = document.getElementById('colA');
-    const colB  = document.getElementById('colB');
-    function syncChips(){ chipA.style.background = colA.value; chipB.style.background = colB.value; }
-    ['change','input'].forEach(ev=>{ colA.addEventListener(ev,syncChips); colB.addEventListener(ev,syncChips); });
+    /* chips de color sincronizados con los pickers */
+    const chipA=document.getElementById('chipA'), chipB=document.getElementById('chipB');
+    const colA=document.getElementById('colA'),  colB=document.getElementById('colB');
+    function syncChips(){ chipA.style.background=colA.value; chipB.style.background=colB.value; }
+    ['change','input'].forEach(e=>{ colA.addEventListener(e,syncChips); colB.addEventListener(e,syncChips); });
     syncChips();
 
-    // PDF simple con la preview del bolso + datos del formulario
-    const form = document.getElementById('orderForm');
-    form.addEventListener('submit', async (e)=>{
+    /* PDF con preview + datos */
+    const form=document.getElementById('orderForm');
+    form.addEventListener('submit', (e)=>{
       e.preventDefault();
       const { jsPDF } = window.jspdf;
       const doc = new jsPDF({ unit:'pt', format:'a4' });
 
-      // cabecera
       doc.setFont('times','normal'); doc.setFontSize(20);
-      doc.setTextColor(142, 95, 73); // terracota
+      doc.setTextColor(142,95,73);
       doc.text('Valonia · Pedido personalizado Tambour', 56, 64);
 
-      // snapshot del bolso
-      let png='', cfg={};
-      if (window.getWizardSnapshot) {
-        const snap = window.getWizardSnapshot();
-        png = snap.png; cfg = snap.config;
-        const imgW = 220, imgH = 220 * 4/3;
-        doc.addImage(png, 'PNG', 56, 92, imgW, imgH, '', 'FAST');
+      if(window.getWizardSnapshot){
+        const { png } = window.getWizardSnapshot();
+        doc.addImage(png,'PNG',56,92,220,220*4/3,'','FAST');
       }
 
-      // datos
       doc.setTextColor(30,27,25); doc.setFontSize(12);
       const f = new FormData(form);
       const lines = [
@@ -259,22 +216,12 @@
         `Email: ${f.get('email')||''}`,
         `Teléfono: ${f.get('telefono')||''}`,
         `Referencia: ${f.get('ref')||''}`,
-        '',
-        `1º cuero · textura: ${document.getElementById('texA').value}, color ${document.getElementById('colA').value}`,
-        `2º cuero · textura: ${document.getElementById('texB').value}, color ${document.getElementById('colB').value}`,
-        '',
-        `Notas:`,
+        '', 'Notas:'
       ];
-      let y = 92;
-      lines.forEach((t,i)=>{ doc.text(t, 300, y + i*18); });
-      // notas (multilínea)
-      const notas = (f.get('notas')||'').split('\n');
-      notas.forEach((t,i)=>{ doc.text(t, 300, y + (lines.length+i)*18); });
-
-      // pie
+      let y=92; lines.forEach((t,i)=>doc.text(t,300,y+i*18));
+      (f.get('notas')||'').split('\n').forEach((t,i)=>doc.text(t,300,y+(lines.length+i)*18));
       doc.setFontSize(10); doc.setTextColor(100);
-      doc.text('Este PDF incluye la previsualización y configuración elegida.', 56, 780);
-
+      doc.text('Incluye previsualización del bolso y configuración elegida.', 56, 780);
       doc.save('valonia-pedido.pdf');
     });
   </script>
