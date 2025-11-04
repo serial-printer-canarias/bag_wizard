@@ -3,290 +3,153 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Valonia · Diseña tu Tambour</title>
+<title>Valonia · Bag Wizard</title>
 
-<!-- Favicon + PWA -->
-<link rel="icon" type="image/png" href="assets/logo/valonia-mark.png" sizes="256x256">
-<link rel="apple-touch-icon" href="assets/logo/valonia-mark.png">
+<!-- Favicon + PWA (usa tus archivos en assets/img/) -->
+<link rel="icon" href="assets/img/logo-valonia_icons.png" sizes="192x192">
+<link rel="apple-touch-icon" href="assets/img/logo-valonia_icons.png">
 <link rel="manifest" href="manifest.webmanifest">
-<meta name="theme-color" content="#7b4b3e">
+
+<!-- Tipografía “fina” estilo Valonia -->
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400&display=swap" rel="stylesheet">
 
 <style>
   :root{
-    --bg:#f7f5f2;
-    --ink:#7b4b3e;            /* terracota tipografía */
-    --muted:#bfa79f;
-    --rose:#e3b8ba;           /* botón */
-    --rose-600:#d9a8ab;
-    --line:#e9e1dc;
+    --bg:#f7f6f4;
+    --ink:#6c483f;           /* terracota tipografía */
+    --rose:#e6b5b5;          /* rosa pastel botones */
+    --line:#eadfda;          /* línea suave */
   }
-
-  /* Reset fino */
-  *{box-sizing:border-box}
   html,body{height:100%}
-  body{
-    margin:0;
-    background:var(--bg);
-    color:var(--ink);
-    font:16px/1.45 Didot, "Bodoni Moda", "Libre Baskerville", Georgia, serif;
-    letter-spacing:.2px;
-  }
+  body{margin:0;background:var(--bg);color:var(--ink);
+       font:16px/1.5 "Cormorant Garamond", Didot, "Bodoni Moda", serif;}
 
-  .wrap{max-width:1200px;margin:28px auto;padding:0 20px}
+  /* Layout */
+  .wrap{max-width:1200px;margin:0 auto;padding:28px 20px}
+  .grid{display:grid;grid-template-columns:minmax(460px,1fr) 440px;gap:24px;align-items:start}
 
-  /* Cabecera derecha (logo + título + controles) y lienzo a la izquierda */
-  .hero{
-    display:grid;
-    grid-template-columns:minmax(380px,1fr) 420px; /* lienzo | columna derecha */
-    gap:36px;
-    align-items:start;
-  }
+  /* Columna izquierda: escenario */
+  .stage{display:flex;align-items:flex-start;justify-content:center}
+  /* sin recuadro blanco */
+  .stage-inner{width:100%;max-width:700px}
+  #cv{display:block;width:100%;height:auto;border:0;outline:0}
 
-  /* Columna izquierda: canvas (sin “caja” blanca) */
-  .stage{
-    display:flex;
-    align-items:flex-start;
-  }
-  #cv{
-    /* El canvas mantiene proporción original 3:4, NO se deforma */
-    width:min(560px, 54vw);
-    aspect-ratio:3/4;
-    height:auto;
-    display:block;
-    border:0;
-    background:transparent;
-  }
+  /* Columna derecha: bloque UI (logo + título + controles + formulario) */
+  .ui{display:flex;flex-direction:column;align-items:center}
+  .brand{display:flex;flex-direction:column;align-items:center;gap:10px;margin-bottom:12px}
+  .brand img{width:96px;height:auto;display:block;opacity:.95}
+  h1{font-weight:300;letter-spacing:.02em;font-size:30px;margin:0}
 
-  /* Columna derecha */
-  .brand{
-    text-align:center;
-    margin-top:6px;
-  }
-  .brand img{
-    width:82px;height:auto;display:block;margin:0 auto 10px auto;
-    opacity:.95;
-  }
-  h1{
-    margin:0 0 14px 0;
-    font-weight:400;
-    font-size:26px;
-    letter-spacing:.6px;
-  }
+  .panel{width:100%;margin-top:18px}
+  .row{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:8px 0}
+  label{font-size:14px;letter-spacing:.06em}
+  select{padding:6px 8px;border:1px solid var(--line);border-radius:10px;background:#fff;
+         font:14px/1.2 "Cormorant Garamond", serif;color:var(--ink)}
+  input[type=color]{appearance:none;border:1px solid var(--line);border-radius:50%;
+                    width:28px;height:28px;padding:0;cursor:pointer;background:#fff}
+  input[type=color]::-webkit-color-swatch{border:none;border-radius:50%}
+  input[type=color]::-moz-color-swatch{border:none;border-radius:50%}
 
-  .panel{
-    margin-top:14px;
-    padding:14px 14px 8px;
-    background:transparent;          /* sin recuadro blanco */
-    border:1px solid transparent;    /* limpio */
-  }
+  .btn{cursor:pointer;border:1px solid var(--line);background:#fff;border-radius:14px;
+       padding:10px 16px;font:16px/1 "Cormorant Garamond", serif;color:var(--ink)}
+  .btn.rose{background:var(--rose);border-color:var(--rose);color:#fff}
 
-  .row{
-    display:grid;
-    grid-template-columns:1fr auto auto;
-    align-items:center;
-    gap:10px;
-    margin:8px 0;
-    font-size:14px;
-    letter-spacing:.3px;
+  /* Form */
+  .form{margin-top:18px;width:100%}
+  .form h2{font-size:18px;font-weight:400;margin:0 0 8px}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .form input,.form textarea{
+    width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:10px;
+    background:#fff;font:15px/1.4 "Cormorant Garamond", serif;color:var(--ink)
   }
-  .row label{opacity:.9}
+  .form textarea{min-height:96px;resize:vertical}
+  .form .check{display:flex;align-items:center;gap:8px;margin:10px 0}
+  .muted{font-size:13px;opacity:.9}
 
-  select{
-    padding:8px 10px;
-    border:1px solid var(--line);
-    background:#fff;
-    border-radius:10px;
-    font-family:inherit;
-    color:var(--ink);
-  }
-  input[type="color"]{
-    width:34px;height:34px;border-radius:50%;
-    border:1px solid var(--line); padding:0; background:#fff;
-    display:inline-block;
-  }
-
-  .actions{display:flex;gap:12px;margin-top:10px}
-  .btn{
-    appearance:none; border:1px solid var(--line);
-    background:#fff; color:var(--ink);
-    padding:10px 14px; border-radius:12px; cursor:pointer;
-    font-family:inherit;
-  }
-  .btn-rose{background:var(--rose); border-color:var(--rose-600); color:#fff}
-  .btn-rose:hover{filter:brightness(.98)}
-
-  /* Formulario */
-  .form{
-    margin-top:34px;
-    padding:0;
-  }
-  .form h2{font-size:18px;margin:0 0 14px;font-weight:400;letter-spacing:.4px}
-  .grid2{
-    display:grid; gap:12px;
-    grid-template-columns:1fr 1fr;
-  }
-  .grid2 .full{grid-column:1 / -1}
-  .field{
-    display:flex; flex-direction:column; gap:6px; font-size:14px;
-  }
-  .field input, .field textarea{
-    width:100%; border:1px solid var(--line); background:#fff;
-    padding:10px 12px; border-radius:12px; font-family:inherit; color:var(--ink);
-  }
-  .field textarea{min-height:90px; resize:vertical}
-  .consent{display:flex; align-items:center; gap:10px; margin:8px 0 14px}
-
-  /* Footer acciones PDF */
-  .pdf-actions{display:flex; gap:12px; align-items:center}
-
-  /* Mobile: todo centrado y en vertical */
+  /* Responsive móvil: todo centrado y apilado */
   @media (max-width: 900px){
-    .hero{grid-template-columns:1fr; gap:18px}
-    #cv{width:min(92vw,560px)}
-    .brand{margin-top:0}
-    .panel{padding:10px}
+    .wrap{padding:18px 14px}
+    .grid{grid-template-columns:1fr;gap:18px}
+    .ui{align-items:center}
+    .brand img{width:84px}
+    h1{font-size:26px}
     .grid2{grid-template-columns:1fr}
+    .stage{order:2}
+    .ui{order:1}
   }
 </style>
 </head>
 <body>
   <div class="wrap">
-    <div class="hero">
-
-      <!-- Lado izquierdo: canvas -->
+    <div class="grid">
+      <!-- Escenario izquierdo -->
       <div class="stage">
-        <canvas id="cv" width="600" height="800" aria-label="Previsualización del Tambour"></canvas>
+        <div class="stage-inner">
+          <canvas id="cv" width="600" height="800" aria-label="Preview del bolso"></canvas>
+        </div>
       </div>
 
-      <!-- Lado derecho: logo + título + controles + formulario -->
-      <aside>
+      <!-- Bloque derecho: logo + título + UI + formulario -->
+      <aside class="ui">
         <div class="brand">
-          <!-- usa SVG si existe; en fallback PNG -->
-          <img src="assets/logo/logo-valonia.svg" onerror="this.onerror=null;this.src='assets/logo/valonia-mark.png'" alt="VALONIA">
+          <!-- RUTA CORRECTA: assets/img/logo-valonia.png -->
+          <img src="assets/img/logo-valonia.png" alt="Valonia" loading="eager">
           <h1>Diseña tu Tambour</h1>
         </div>
 
-        <div class="panel">
-          <!-- Controles muy limpios -->
+        <div class="panel" aria-label="Opciones de personalización">
           <div class="row">
-            <label>1º CUERO · TEXTURA</label>
-            <select id="texA">
-              <option value="smooth">Lisa</option>
-              <option value="suede">Ante</option>
-            </select>
-            <input id="colA" type="color" value="#e6c0c3" aria-label="Color primer cuero">
-          </div>
-
-          <div class="row">
-            <label>2º CUERO · TEXTURA</label>
-            <select id="texB">
-              <option value="smooth">Lisa</option>
-              <option value="suede">Ante</option>
-            </select>
-            <input id="colB" type="color" value="#7b4b3e" aria-label="Color segundo cuero">
-          </div>
-
-          <!-- Costura oculta (negra), pero existe para que el script no falle -->
-          <input id="stitchColor" type="hidden" value="#111111">
-
-          <div class="actions">
-            <button id="dl" class="btn btn-rose">Descargar preview</button>
-          </div>
-        </div>
-
-        <!-- Formulario -->
-        <form class="form" id="orderForm" onsubmit="return false;">
-          <h2>Datos para tu pedido</h2>
-          <div class="grid2">
-            <div class="field"><label>Nombre y apellidos</label><input id="f_name" placeholder="Tu nombre"></div>
-            <div class="field"><label>Email</label><input id="f_mail" type="email" placeholder="tucorreo@dominio.com"></div>
-
-            <div class="field"><label>Teléfono</label><input id="f_phone" placeholder="+34 ..."></div>
-            <div class="field"><label>Referencia de pedido (opcional)</label><input id="f_ref" placeholder="EJ: TIENDA-1234"></div>
-
-            <div class="field full"><label>Notas</label>
-              <textarea id="f_notes" placeholder="Color interior, largo de correas, observaciones…"></textarea>
+            <label for="texA">1º CUERO · TEXTURA</label>
+            <div style="display:flex;align-items:center;gap:8px">
+              <select id="texA">
+                <option value="smooth">Lisa</option>
+                <option value="suede">Ante</option>
+              </select>
+              <input id="colA" type="color" value="#e6b5b5" aria-label="Color cuero 1">
             </div>
           </div>
 
-          <label class="consent">
-            <input id="f_ok" type="checkbox"> Acepto la política de privacidad y el tratamiento de datos para gestionar este pedido.
+          <div class="row">
+            <label for="texB">2º CUERO · TEXTURA</label>
+            <div style="display:flex;align-items:center;gap:8px">
+              <select id="texB">
+                <option value="smooth">Lisa</option>
+                <option value="suede">Ante</option>
+              </select>
+              <input id="colB" type="color" value="#7b4b3e" aria-label="Color cuero 2">
+            </div>
+          </div>
+
+          <div class="row" style="justify-content:flex-end;margin-top:12px">
+            <button id="dl" class="btn rose">Descargar preview</button>
+          </div>
+        </div>
+
+        <!-- Formulario (sin “Referencia de pedido”) -->
+        <form class="form" onsubmit="return false">
+          <h2>Datos para tu pedido</h2>
+          <div class="grid2">
+            <input type="text" name="name" placeholder="Nombre y apellidos" autocomplete="name">
+            <input type="email" name="email" placeholder="Email" autocomplete="email">
+            <input type="tel" name="phone" placeholder="Teléfono" autocomplete="tel">
+            <div></div>
+          </div>
+          <textarea name="notes" placeholder="Color interior, largo de correas, observaciones…"></textarea>
+
+          <label class="check">
+            <input type="checkbox" required>
+            <span class="muted">Acepto la política de privacidad y el tratamiento de datos para gestionar este pedido.</span>
           </label>
 
-          <div class="pdf-actions">
-            <button id="makePdf" class="btn btn-rose">Generar PDF del pedido</button>
-            <small style="opacity:.7">Incluye la previsualización y tu configuración.</small>
-          </div>
+          <!-- Campo oculto donde guardamos el JSON por si lo necesitas -->
+          <input type="hidden" id="spbc_config_json">
         </form>
       </aside>
     </div>
   </div>
 
-  <!-- libs -->
+  <!-- Fabric + tu customizer (NO modificado) -->
   <script src="https://cdn.jsdelivr.net/npm/fabric@5.3.0/dist/fabric.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
-
-  <!-- lógica del configurador -->
   <script src="js/customizer.js"></script>
-
-  <script>
-    // PDF del pedido (no toca nada del customizer)
-    document.getElementById('makePdf').addEventListener('click', async () => {
-      if(!document.getElementById('f_ok').checked){
-        alert('Debes aceptar la política de privacidad.');
-        return;
-      }
-      const snap = window.getWizardSnapshot ? window.getWizardSnapshot() : null;
-      if(!snap){ alert('Aún no está lista la previsualización.'); return; }
-
-      const { jsPDF } = window.jspdf;
-      const doc = new jsPDF({ unit:'pt', format:'a4' });
-      const pad = 36;
-
-      doc.setFont('Times','normal'); // fino, elegante
-      doc.setTextColor(60,45,40);
-
-      // Encabezado
-      doc.setFontSize(18);
-      doc.text('VALONIA · Pedido Tambour', pad, 54);
-
-      // Imagen preview
-      const imgW = 260, imgH = imgW * 4/3; // respeta proporción 3:4 de canvas
-      doc.addImage(snap.png, 'PNG', pad, 80, imgW, imgH);
-
-      // Datos
-      let x = pad + imgW + 24, y = 92;
-      doc.setFontSize(12);
-      const lines = [
-        ['Nombre', document.getElementById('f_name').value || '-'],
-        ['Email', document.getElementById('f_mail').value || '-'],
-        ['Teléfono', document.getElementById('f_phone').value || '-'],
-        ['Referencia', document.getElementById('f_ref').value || '-']
-      ];
-      lines.forEach(([k,v]) => { doc.text(`${k}: ${v}`, x, y); y += 18; });
-
-      y += 8;
-      doc.text('Notas:', x, y); y += 16;
-      const notes = (document.getElementById('f_notes').value || '—');
-      const wrapped = doc.splitTextToSize(notes, 260);
-      doc.text(wrapped, x, y);
-
-      // Config elegida
-      y = 80 + imgH + 24;
-      doc.setFontSize(13);
-      doc.text('Configuración elegida', pad, y);
-      y += 14; doc.setFontSize(12);
-      doc.text(`1º cuero: ${snap.config.A.texture} · ${snap.config.A.color}`, pad, y);
-      y += 16;
-      doc.text(`2º cuero: ${snap.config.B.texture} · ${snap.config.B.color}`, pad, y);
-      y += 22;
-      doc.setFontSize(10);
-      doc.setTextColor(130);
-      doc.text('Generado automáticamente desde valoniabrand.com', pad, y);
-
-      const ts = new Date().toISOString().replace(/[:.]/g,'-');
-      doc.save(`valonia-pedido-${ts}.pdf`);
-    });
-  </script>
 </body>
 </html>
