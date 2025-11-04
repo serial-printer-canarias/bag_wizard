@@ -7,17 +7,13 @@
 
 <style>
   :root{
-    --bg:#f7f7f9;
-    --ink:#221E1B;
-    --terra:#8C5A45;
-    --rose:#E7BFC2;
-    --line:#eaeaea;
-
-    --rightCol: 420px;        /* ancho columna derecha */
-    --gap-logo-title: 30px;   /* aire entre logo y título */
-    --gap-title-options: 18px;/* aire entre título y opciones */
-    --desk-gap: 32px;         /* separación entre columnas desktop */
-    --m-gap: 22px;            /* separación vertical en móvil */
+    --bg:#f7f7f9; --ink:#221E1B; --terra:#8C5A45; --rose:#E7BFC2; --line:#eaeaea;
+    --rightCol: 420px;
+    --gap-logo-title: 38px;   /* ↑ más aire: logo ↔ título */
+    --gap-title-options: 16px;/* título ↔ opciones */
+    --desk-gap: 18px;         /* ↓ más cerca del bolso */
+    --nudge-left: -8px;       /* pequeño “empuje” del bloque hacia el bolso */
+    --m-gap: 22px;
   }
 
   @font-face{
@@ -37,25 +33,20 @@
     align-items:start;
   }
 
-  /* Canvas: más arriba y un poco más pequeño para que quepa entero */
+  /* Canvas más pequeño para que entre entero */
   .stage{display:flex;justify-content:flex-start;align-items:flex-start}
   #cv{
     display:block;background:transparent;border:none;border-radius:0;
-    width:clamp(340px, 50vw, 680px);  /* ↓ más pequeño que antes */
-    height:auto;
-    margin-top:4px;
+    width:clamp(320px, 44vw, 640px);  /* ↓ antes 50vw/680px */
+    height:auto;margin-top:4px;
   }
 
-  /* Bloque derecho compacto y CENTRADO entre sí */
+  /* Bloque derecho compacto, centrado entre sí y más pegado a la izquierda */
   .side{
     display:flex;flex-direction:column;align-items:center;text-align:center;
-    gap:var(--gap-title-options);
-    align-self:center; /* centra vertical frente al bolso */
+    gap:var(--gap-title-options);align-self:center;margin-left:var(--nudge-left);
   }
-  .brand{
-    display:flex;flex-direction:column;align-items:center;text-align:center;
-    gap:var(--gap-logo-title);
-  }
+  .brand{display:flex;flex-direction:column;align-items:center;text-align:center;gap:var(--gap-logo-title)}
   .brand img{height:130px;object-fit:contain;display:block}
   .brand h1{
     margin:0;
@@ -72,16 +63,13 @@
     appearance:none;-webkit-appearance:none;background:#fff;
     border:1px solid var(--line);border-radius:12px;padding:6px 28px 6px 10px;font-size:13px
   }
-  input[type="color"]{
-    width:24px;height:24px;border-radius:50%;
-    border:2px solid #efefef;background:#fff;box-shadow:0 1px 0 rgba(0,0,0,.03)
-  }
+  input[type="color"]{width:24px;height:24px;border-radius:50%;border:2px solid #efefef;background:#fff;box-shadow:0 1px 0 rgba(0,0,0,.03)}
   .row--stitch{display:none}
   .actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:6px}
   button{cursor:pointer;border-radius:12px;padding:9px 14px;font-weight:600;border:1px solid var(--line);background:var(--rose);color:#5a3a2c}
 
-  /* Formulario limpio con aire */
-  .order{max-width:980px;margin:40px auto 0 auto;background:transparent;border:none;padding:0}
+  /* Formulario limpio */
+  .order{max-width:980px;margin:40px auto 0;background:transparent;border:none;padding:0}
   .order h2{
     margin:0 0 20px 0;
     font-family:"Didot LP","Didot","Bodoni Moda","Playfair Display",Times,serif;
@@ -90,18 +78,16 @@
   .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:26px 30px}
   .order .form-grid>div{display:flex;flex-direction:column;gap:8px}
   .order label{font-size:13px;color:#6c5a4f}
-  .order input,.order textarea{
-    width:100%;border:1px solid var(--line);border-radius:12px;padding:14px 12px;background:#fff;font-size:14px
-  }
+  .order input,.order textarea{width:100%;border:1px solid var(--line);border-radius:12px;padding:14px 12px;background:#fff;font-size:14px}
   .order textarea{min-height:124px;resize:vertical}
   .small{font-size:12px;color:#7a7a7a}
 
   /* Móvil: bloques separados y centrados: logo → bolso → opciones → formulario */
   @media (max-width:980px){
     .grid{grid-template-columns:1fr;gap:var(--m-gap);justify-items:center}
-    .brand{gap:24px}
     #cv{width:min(92vw,520px)}
-    .side{gap:22px}
+    .side{gap:22px;margin-left:0}
+    .brand{gap:24px}
     .order{margin:34px 16px 0}
     .form-grid{grid-template-columns:1fr}
     .order h2{text-align:center}
@@ -112,12 +98,10 @@
 
   <div class="wrap">
     <div class="grid">
-      <!-- Izquierda: bolso -->
       <div class="stage">
         <canvas id="cv" width="600" height="800"></canvas>
       </div>
 
-      <!-- Derecha: bloque compacto centrado (logo + título + opciones) -->
       <aside class="side">
         <div class="brand">
           <img src="assets/img/logo-valonia.png" alt="Valonia">
@@ -154,7 +138,6 @@
       </aside>
     </div>
 
-    <!-- Formulario -->
     <section class="order">
       <h2>Datos para tu pedido</h2>
       <form id="orderForm">
@@ -163,17 +146,10 @@
           <div><label>Email</label><input name="email" type="email" required></div>
           <div><label>Teléfono</label><input name="phone" type="tel"></div>
           <div><label>Referencia de pedido (opcional)</label><input name="ref"></div>
-          <div style="grid-column:1/-1">
-            <label>Notas</label>
-            <textarea name="notes" placeholder="Color interior, largo de correa, observaciones…"></textarea>
-          </div>
-          <div style="grid-column:1/-1">
-            <label class="small"><input type="checkbox" required> Acepto la política de privacidad y el tratamiento de datos para gestionar este pedido.</label>
-          </div>
+          <div style="grid-column:1/-1"><label>Notas</label><textarea name="notes" placeholder="Color interior, largo de correa, observaciones…"></textarea></div>
+          <div style="grid-column:1/-1"><label class="small"><input type="checkbox" required> Acepto la política de privacidad y el tratamiento de datos para gestionar este pedido.</label></div>
         </div>
-        <div class="actions" style="margin-top:16px">
-          <button type="submit" id="orderBtn">Generar PDF del pedido</button>
-        </div>
+        <div class="actions" style="margin-top:16px"><button type="submit" id="orderBtn">Generar PDF del pedido</button></div>
         <p class="small">El PDF incluirá la previsualización del bolso y la configuración elegida.</p>
       </form>
     </section>
