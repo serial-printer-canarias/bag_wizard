@@ -14,8 +14,9 @@
     dl:$('#dl'), save:$('#save'), hidden:$('#spbc_config_json')
   };
 
-  const canvas=new fabric.Canvas('cv',{ selection:false });
-  let W=600, H=800;
+  const W=600,H=800;
+  const canvas=new fabric.Canvas('cv',{selection:false});
+  canvas.setWidth(W); canvas.setHeight(H);
 
   // Debug
   const dbg=document.createElement('div');
@@ -26,61 +27,48 @@
   let mode=''; let bucketA=[], bucketB=[];
   let outlineSet=new Set(); let stitchSet=new Set();
   let imgSmooth=null, imgSuede=null;
-  let rootObj=null;
 
   // ---------- helpers ----------
-  function syncCanvasToCSS(){
-    const el = canvas.getElement();
-    const cssW = Math.max(50, el.clientWidth || W);
-    const cssH = Math.max(50, el.clientHeight || H);
-    const dpr  = window.devicePixelRatio || 1;
-
-    canvas.setDimensions({ width: cssW * dpr, height: cssH * dpr });
-    canvas.setViewportTransform([dpr,0,0,dpr,0,0]);
-    W = cssW; H = cssH;
-
-    if(rootObj){ fit(rootObj); canvas.requestRenderAll(); }
-  }
-
-  // Bounding box real del contenido (no el viewBox)
+  // bounding box "real" usando las esquinas absolutas de cada hoja (sin depender del viewBox)
   function tightBounds(root){
-    const parts = leafs(root);
-    let minX=Infinity, minY=Infinity, maxX=-Infinity, maxY=-Infinity;
-    parts.forEach(o=>{
-      const r=o.getBoundingRect(true,true);
-      if(r.left < minX) minX=r.left;
-      if(r.top  < minY) minY=r.top;
-      if(r.left+r.width  > maxX) maxX=r.left+r.width;
-      if(r.top +r.height > maxY) maxY=r.top +r.height;
+    root.setCoords();
+    let minX= Infinity, minY= Infinity, maxX=-Infinity, maxY=-Infinity;
+    const push = (x,y)=>{ if(x<minX)minX=x; if(y<minY)minY=y; if(x>maxX)maxX=x; if(y>maxY)maxY=y; };
+    leafs(root).forEach(o=>{
+      o.setCoords();
+      const a=o.aCoords; if(!a) return;
+      push(a.tl.x,a.tl.y); push(a.tr.x,a.tr.y);
+      push(a.bl.x,a.bl.y); push(a.br.x,a.br.y);
     });
-    return { x:minX, y:minY, w:Math.max(1,maxX-minX), h:Math.max(1,maxY-minY) };
+    const w=Math.max(1,maxX-minX), h=Math.max(1,maxY-minY);
+    return {x:minX,y:minY,w,h,cx:minX+w/2,cy:minY+h/2};
   }
 
+  // AJUSTE NUEVO: mantiene proporción, usa caja real y centra
   function fit(g){
-    // margen fino ~6% sobre el lado menor
-    const M = Math.max(24, Math.round(Math.min(W,H)*0.06));
-    const maxW = W - 2*M;
-    const maxH = H - 2*M;
+    const M = Math.max(24, Math.round(Math.min(W,H)*0.06)); // margen limpio
+    const maxW = W - 2*M, maxH = H - 2*M;
+    const FILL = 1.00; // 1.00 apura; <1 más aire; >1 recorta margen
 
-    // normalizar para medir
-    g.set({ scaleX:1, scaleY:1, left:0, top:0 });
+    // 1) medir con escala/posición actuales
+    let bb = tightBounds(g);
+
+    // 2) factor para encajar la caja real
+    const k = Math.min(maxW/bb.w, maxH/bb.h) * FILL;
+
+    // escalar alrededor de su centro (no de la esquina) para no desplazar raro
+    const prevScaleX = g.scaleX || 1, prevScaleY = g.scaleY || 1;
+    const mul = k; // bb ya está en coords de canvas (incluye escala actual)
+    g.scaleX = prevScaleX * mul;
+    g.scaleY = prevScaleY * mul;
+
+    // 3) recalcular caja y centrarla en el canvas
     g.setCoords();
-
-    const bb = tightBounds(g); // caja real del bolso
-    const base = Math.min(maxW / bb.w, maxH / bb.h);
-    const FILL = 1.00; // 1.00 = apura al margen; <1 más aire; >1 recorta margen
-    const s = base * FILL;
-
-    // centrar el contenido real
-    const targetW = bb.w * s, targetH = bb.h * s;
-    const left = (W - targetW)/2 - bb.x * s;
-    const top  = (H - targetH)/2 - bb.y * s;
-
-    g.set({
-      scaleX:s, scaleY:s,
-      left, top,
-      selectable:false, evented:false
-    });
+    bb = tightBounds(g);
+    const dx = (W/2) - bb.cx;
+    const dy = (H/2) - bb.cy;
+    g.left = (g.left||0) + dx;
+    g.top  = (g.top ||0) + dy;
     g.setCoords();
   }
 
@@ -347,15 +335,13 @@
   Promise.all([loadImg(TX.smooth), loadImg(TX.suede)]).then(([a,b])=>{ imgSmooth=a; imgSuede=b; });
 
   fabric.loadSVGFromURL(SVG,(objs,opts)=>{
-    rootObj=fabric.util.groupSVGElements(objs,opts);
-    rootObj.set({ scaleX:1, scaleY:1, left:0, top:0 });
-    canvas.add(rootObj);
+    const root=fabric.util.groupSVGElements(objs,opts);
+    canvas.add(root);
+    fit(root); // ← encaje con proporción y centrado reales
 
-    syncCanvasToCSS();
-
-    collectStitch(rootObj);
-    styleAndCollectOutlines(rootObj);
-    buildBuckets(rootObj);
+    collectStitch(root);
+    styleAndCollectOutlines(root);
+    buildBuckets(root);
     paint();
   },(item,obj)=>{ obj.selectable=false; });
 
@@ -387,7 +373,7 @@
     });
   }
 
-  // Snapshot para el formulario
+  // Snapshot para formulario (sin tocar lógica)
   window.getWizardSnapshot = function(){
     const cfg = {
       model:'bucket-01',
@@ -400,7 +386,4 @@
     const png = canvas.toDataURL({ format:'png', multiplier: 1.5 });
     return { png, config: cfg };
   };
-
-  window.addEventListener('resize', syncCanvasToCSS);
-  setTimeout(syncCanvasToCSS, 0);
 })();
