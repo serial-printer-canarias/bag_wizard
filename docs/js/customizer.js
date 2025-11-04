@@ -14,9 +14,7 @@
     dl:$('#dl'), save:$('#save'), hidden:$('#spbc_config_json')
   };
 
-  // Canvas base
   const canvas=new fabric.Canvas('cv',{ selection:false });
-  // Fallback
   let W=600, H=800;
 
   // Debug
@@ -44,28 +42,44 @@
     if(rootObj){ fit(rootObj); canvas.requestRenderAll(); }
   }
 
+  // Bounding box real del contenido (no el viewBox)
+  function tightBounds(root){
+    const parts = leafs(root);
+    let minX=Infinity, minY=Infinity, maxX=-Infinity, maxY=-Infinity;
+    parts.forEach(o=>{
+      const r=o.getBoundingRect(true,true);
+      if(r.left < minX) minX=r.left;
+      if(r.top  < minY) minY=r.top;
+      if(r.left+r.width  > maxX) maxX=r.left+r.width;
+      if(r.top +r.height > maxY) maxY=r.top +r.height;
+    });
+    return { x:minX, y:minY, w:Math.max(1,maxX-minX), h:Math.max(1,maxY-minY) };
+  }
+
   function fit(g){
-    // Margen más fino (≈6%) y escala uniforme
+    // margen fino ~6% sobre el lado menor
     const M = Math.max(24, Math.round(Math.min(W,H)*0.06));
     const maxW = W - 2*M;
     const maxH = H - 2*M;
 
-    const r0 = g.getBoundingRect(true,true);
-    const w0 = r0.width;
-    const h0 = r0.height;
+    // normalizar para medir
+    g.set({ scaleX:1, scaleY:1, left:0, top:0 });
+    g.setCoords();
 
-    const base = Math.min(maxW / w0, maxH / h0);
-    const EXTRA = 0.92; // entra entero, tamaño equilibrado
-    const s = base * EXTRA;
+    const bb = tightBounds(g); // caja real del bolso
+    const base = Math.min(maxW / bb.w, maxH / bb.h);
+    const FILL = 1.00; // 1.00 = apura al margen; <1 más aire; >1 recorta margen
+    const s = base * FILL;
 
-    g.set({ scaleX:s, scaleY:s, originX:'left', originY:'top' });
+    // centrar el contenido real
+    const targetW = bb.w * s, targetH = bb.h * s;
+    const left = (W - targetW)/2 - bb.x * s;
+    const top  = (H - targetH)/2 - bb.y * s;
 
-    const w = w0 * s, h = h0 * s;
     g.set({
-      left: (W - w)/2,
-      top:  (H - h)/2,
-      selectable:false,
-      evented:false
+      scaleX:s, scaleY:s,
+      left, top,
+      selectable:false, evented:false
     });
     g.setCoords();
   }
@@ -301,9 +315,9 @@
 
   // --------- PINTADO ----------
   function paint(){
-    const colA=ui.colA.value||'#e6e6e6', colB=ui.colB.value||'#c61a1a';
-    const patA=tintPattern(ui.texA.value==='suede'?imgSuede:imgSmooth, colA);
-    const patB=tintPattern(ui.texB.value==='suede'?imgSuede:imgSmooth, colB);
+    const colA=ui.colA?.value||'#e6e6e6', colB=ui.colB?.value||'#c61a1a';
+    const patA=tintPattern(ui.texA?.value==='suede'?imgSuede:imgSmooth, colA);
+    const patB=tintPattern(ui.texB?.value==='suede'?imgSuede:imgSmooth, colB);
 
     bucketA.forEach(o=>{ applyFill(o, patA); o.dirty=true; });
     bucketB.forEach(o=>{ applyFill(o, patB); o.dirty=true; });
@@ -330,10 +344,8 @@
     canvas.requestRenderAll();
   }
 
-  // Cargar texturas
   Promise.all([loadImg(TX.smooth), loadImg(TX.suede)]).then(([a,b])=>{ imgSmooth=a; imgSuede=b; });
 
-  // Cargar SVG
   fabric.loadSVGFromURL(SVG,(objs,opts)=>{
     rootObj=fabric.util.groupSVGElements(objs,opts);
     rootObj.set({ scaleX:1, scaleY:1, left:0, top:0 });
@@ -375,12 +387,13 @@
     });
   }
 
+  // Snapshot para el formulario
   window.getWizardSnapshot = function(){
     const cfg = {
       model:'bucket-01',
       mode,
-      A:{ texture: ui.texA.value, color: ui.colA.value },
-      B:{ texture: ui.texB.value, color: ui.colB.value },
+      A:{ texture: ui.texA?.value, color: ui.colA?.value },
+      B:{ texture: ui.texB?.value, color: ui.colB?.value },
       C:{ texture:'none', color: ui.stitch ? ui.stitch.value : '#111111' },
       version:'1.0.1'
     };
