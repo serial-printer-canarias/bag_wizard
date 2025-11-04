@@ -12,9 +12,12 @@
     --terra:#8C5A45;
     --rose:#E7BFC2;
     --line:#eaeaea;
-    --rightCol: 420px;   /* ancho del bloque derecho */
-    --gap-logo-title: 22px;  /* espacio logo ↔ título */
-    --gap-title-options: 10px;/* espacio título ↔ opciones (¡más junto!) */
+
+    --rightCol: 420px;        /* ancho columna derecha */
+    --gap-logo-title: 30px;   /* aire entre logo y título */
+    --gap-title-options: 18px;/* aire entre título y opciones */
+    --desk-gap: 32px;         /* separación entre columnas desktop */
+    --m-gap: 22px;            /* separación vertical en móvil */
   }
 
   @font-face{
@@ -26,27 +29,34 @@
   html,body{margin:0;background:var(--bg);color:var(--ink)}
   body{font:15px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif}
 
-  /* GRID: canvas a la izquierda; bloque (logo+título+opciones) a la derecha */
   .wrap{max-width:1200px;margin:0 auto;padding:0 18px 34px}
   .grid{
     display:grid;
     grid-template-columns:minmax(340px,1fr) var(--rightCol);
-    gap:28px;
+    gap:var(--desk-gap);
     align-items:start;
   }
 
-  /* Canvas bien arriba, sin bordes */
+  /* Canvas: más arriba y un poco más pequeño para que quepa entero */
   .stage{display:flex;justify-content:flex-start;align-items:flex-start}
-  #cv{display:block;background:transparent;border:none;width:clamp(380px,58vw,780px);height:auto;margin-top:4px}
-
-  /* BLOQUE derecho unificado (logo + título + opciones) */
-  .side{
-    display:flex; flex-direction:column; align-items:flex-start; /* a la izquierda */
-    gap:var(--gap-title-options);                  /* hueco pequeño entre título y opciones */
-    align-self:center;                             /* centrado vertical respecto al bolso */
+  #cv{
+    display:block;background:transparent;border:none;border-radius:0;
+    width:clamp(340px, 50vw, 680px);  /* ↓ más pequeño que antes */
+    height:auto;
+    margin-top:4px;
   }
-  .brand{display:flex;flex-direction:column;align-items:flex-start;gap:var(--gap-logo-title)}
-  .brand img{height:126px;object-fit:contain;display:block}
+
+  /* Bloque derecho compacto y CENTRADO entre sí */
+  .side{
+    display:flex;flex-direction:column;align-items:center;text-align:center;
+    gap:var(--gap-title-options);
+    align-self:center; /* centra vertical frente al bolso */
+  }
+  .brand{
+    display:flex;flex-direction:column;align-items:center;text-align:center;
+    gap:var(--gap-logo-title);
+  }
+  .brand img{height:130px;object-fit:contain;display:block}
   .brand h1{
     margin:0;
     font-family:"Didot LP","Didot","Bodoni Moda","Playfair Display",Times,serif;
@@ -59,24 +69,25 @@
     font-weight:400;font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--terra)
   }
   select{
-    appearance:none;-webkit-appearance:none;background:#fff;border:1px solid var(--line);
-    border-radius:12px;padding:6px 28px 6px 10px;font-size:13px
+    appearance:none;-webkit-appearance:none;background:#fff;
+    border:1px solid var(--line);border-radius:12px;padding:6px 28px 6px 10px;font-size:13px
   }
   input[type="color"]{
-    width:24px;height:24px;border-radius:50%;border:2px solid #efefef;background:#fff;box-shadow:0 1px 0 rgba(0,0,0,.03)
+    width:24px;height:24px;border-radius:50%;
+    border:2px solid #efefef;background:#fff;box-shadow:0 1px 0 rgba(0,0,0,.03)
   }
   .row--stitch{display:none}
   .actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:6px}
   button{cursor:pointer;border-radius:12px;padding:9px 14px;font-weight:600;border:1px solid var(--line);background:var(--rose);color:#5a3a2c}
 
-  /* Formulario limpio con más aire */
-  .order{max-width:980px;margin:40px auto 0;background:transparent;border:none;padding:0}
+  /* Formulario limpio con aire */
+  .order{max-width:980px;margin:40px auto 0 auto;background:transparent;border:none;padding:0}
   .order h2{
     margin:0 0 20px 0;
     font-family:"Didot LP","Didot","Bodoni Moda","Playfair Display",Times,serif;
     font-weight:400;font-size:18px;letter-spacing:.02em;color:var(--terra)
   }
-  .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:24px 28px}
+  .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:26px 30px}
   .order .form-grid>div{display:flex;flex-direction:column;gap:8px}
   .order label{font-size:13px;color:#6c5a4f}
   .order input,.order textarea{
@@ -85,12 +96,12 @@
   .order textarea{min-height:124px;resize:vertical}
   .small{font-size:12px;color:#7a7a7a}
 
-  /* MÓVIL: todo centrado y orden: logo → bolso → opciones → formulario */
+  /* Móvil: bloques separados y centrados: logo → bolso → opciones → formulario */
   @media (max-width:980px){
-    .grid{grid-template-columns:1fr;gap:22px;justify-items:center}
-    #cv{width:min(92vw,560px)}
-    .side{align-items:center;text-align:center}
-    .brand{align-items:center}
+    .grid{grid-template-columns:1fr;gap:var(--m-gap);justify-items:center}
+    .brand{gap:24px}
+    #cv{width:min(92vw,520px)}
+    .side{gap:22px}
     .order{margin:34px 16px 0}
     .form-grid{grid-template-columns:1fr}
     .order h2{text-align:center}
@@ -106,7 +117,7 @@
         <canvas id="cv" width="600" height="800"></canvas>
       </div>
 
-      <!-- Derecha: bloque compacto (logo + título + opciones) -->
+      <!-- Derecha: bloque compacto centrado (logo + título + opciones) -->
       <aside class="side">
         <div class="brand">
           <img src="assets/img/logo-valonia.png" alt="Valonia">
