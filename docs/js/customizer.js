@@ -30,41 +30,12 @@
 
   // ---------- helpers ----------
   function fit(g){
-    // SOLO ajuste de ANCHO del SVG a “tamaño normal”, manteniendo proporción.
-    const isMob = window.matchMedia('(max-width: 768px)').matches;
-    const PAD = isMob ? 18 : 22;                        // margen interno
-    const TARGET_W_RATIO_DESK = 0.44;                   // % del ancho útil que ocupa el bolso en desktop
-    const TARGET_W_RATIO_MOB  = 0.52;                   // % en móvil
-    const targetRatio = isMob ? TARGET_W_RATIO_MOB : TARGET_W_RATIO_DESK;
-
-    const maxW = W - 2*PAD;
-    const maxH = H - 2*PAD;
-
-    // Reset para medir bien
-    g.set({ scaleX:1, scaleY:1, left:0, top:0 });
-    const r0 = g.getBoundingRect(true, true);
-    const w = Math.max(1, r0.width);
-    const h = Math.max(1, r0.height);
-
-    // Escala definida por ANCHO deseado
-    const desiredWidth = maxW * targetRatio;
-    let s = desiredWidth / w;
-
-    // Salvaguarda por si la altura se sale
-    if (h * s > maxH) {
-      s = (maxH / h) * 0.98; // un pelín de aire
-    }
-
+    const m=24,maxW=W-2*m,maxH=H-2*m;
+    const w=g.width||g.getScaledWidth(),h=g.height||g.getScaledHeight();
+    const s=Math.min(maxW/w,maxH/h);
     g.scale(s);
-    g.set({
-      left:(W - w*s)/2,
-      top :(H - h*s)/2,
-      selectable:false,
-      evented:false
-    });
-    g.setCoords();
+    g.set({left:(W-w*s)/2,top:(H-h*s)/2,selectable:false,evented:false});
   }
-
   function walk(arr,fn){ (function rec(a){ a.forEach(o=>{ fn(o); if(o._objects&&o._objects.length) rec(o._objects); }); })(arr); }
   function leafs(root){ const out=[]; walk([root], o=>{ if(o._objects&&o._objects.length) return; if(o.type==='image') return; out.push(o); }); return out; }
   function idsMap(arr){ const map={}; walk(arr,o=>{ if(o.id) map[o.id]=o; }); return map; }
@@ -237,7 +208,7 @@
         if(isOutlineStroke(o)){
           o.set({fill:'none', stroke:'#111', strokeWidth:1.4, strokeLineCap:'round', strokeLineJoin:'round', strokeUniform:true, opacity:1});
         }else{
-          o.set({fill:'#111', stroke:null, strokeWidth:0});
+          o.set({fill:'#111', stroke:null, strokeWidth:0, opacity:1});
         }
         if(o.group) bringChildToTop(o.group,o);
       }
@@ -296,9 +267,9 @@
 
   // --------- PINTADO ----------
   function paint(){
-    const colA=ui.colA?.value||'#e6e6e6', colB=ui.colB?.value||'#c61a1a';
-    const patA=tintPattern(ui.texA?.value==='suede'?imgSuede:imgSmooth, colA);
-    const patB=tintPattern(ui.texB?.value==='suede'?imgSuede:imgSmooth, colB);
+    const colA=ui.colA.value||'#e6e6e6', colB=ui.colB.value||'#c61a1a';
+    const patA=tintPattern(ui.texA.value==='suede'?imgSuede:imgSmooth, colA);
+    const patB=tintPattern(ui.texB.value==='suede'?imgSuede:imgSmooth, colB);
 
     bucketA.forEach(o=>{ applyFill(o, patA); o.dirty=true; });
     bucketB.forEach(o=>{ applyFill(o, patB); o.dirty=true; });
@@ -327,39 +298,31 @@
 
   Promise.all([loadImg(TX.smooth), loadImg(TX.suede)]).then(([a,b])=>{ imgSmooth=a; imgSuede=b; });
 
-  let rootObj=null;
-
   fabric.loadSVGFromURL(SVG,(objs,opts)=>{
-    rootObj=fabric.util.groupSVGElements(objs,opts);
-    canvas.add(rootObj);
-    fit(rootObj);
+    const root=fabric.util.groupSVGElements(objs,opts);
+    fit(root); canvas.add(root);
 
-    collectStitch(rootObj);
-    styleAndCollectOutlines(rootObj);
-    buildBuckets(rootObj);
+    collectStitch(root);
+    styleAndCollectOutlines(root);
+    buildBuckets(root);
     paint();
   },(item,obj)=>{ obj.selectable=false; });
 
-  window.addEventListener('resize', ()=>{
-    if(!rootObj) return;
-    fit(rootObj);
-    canvas.requestRenderAll();
-  });
-
   // UI
   ['change','input'].forEach(ev=>{
-    ui.colA?.addEventListener(ev, paint);
-    ui.colB?.addEventListener(ev, paint);
-    ui.texA?.addEventListener(ev, paint);
-    ui.texB?.addEventListener(ev, paint);
-    ui.stitch?.addEventListener(ev, paint);
+    ui.colA.addEventListener(ev, paint);
+    ui.colB.addEventListener(ev, paint);
+    ui.texA.addEventListener(ev, paint);
+    ui.texB.addEventListener(ev, paint);
+    if(ui.stitch) ui.stitch.addEventListener(ev, paint);
   });
 
-  ui.dl?.addEventListener('click', ()=>{
+  ui.dl.addEventListener('click', ()=>{
     const data=canvas.toDataURL({format:'png',multiplier:1.5});
     const a=document.createElement('a'); a.href=data; a.download='bolso-preview.png'; a.click();
   });
 
+  /* ← guardia para no romper si “Ver JSON” no existe */
   if(ui.save){
     ui.save.addEventListener('click', ()=>{
       ui.hidden.value = JSON.stringify({
@@ -373,18 +336,4 @@
       alert(ui.hidden.value);
     });
   }
-
-  // Snapshot para formulario
-  window.getWizardSnapshot = function(){
-    const cfg = {
-      model:'bucket-01',
-      mode,
-      A:{ texture: ui.texA?.value, color: ui.colA?.value },
-      B:{ texture: ui.texB?.value, color: ui.colB?.value },
-      C:{ texture:'none', color: ui.stitch ? ui.stitch.value : '#111111' },
-      version:'1.0.1'
-    };
-    const png = canvas.toDataURL({ format:'png', multiplier: 1.5 });
-    return { png, config: cfg };
-  };
 })();
