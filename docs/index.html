@@ -11,13 +11,12 @@
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="theme-color" content="#c59a8b">
 
-<!-- Estilos: limpio, fino, terracota y pastel -->
 <style>
   :root{
     --bg:#f7f6f4;
-    --ink:#6e4a3b;           /* terracota tipografía */
+    --ink:#6e4a3b;
     --line:#e7e1dc;
-    --pill:#efc7c3;          /* rosa pastel botones */
+    --pill:#efc7c3;
     --pillH:#e8b7b1;
   }
   *{box-sizing:border-box}
@@ -25,75 +24,76 @@
   body{
     margin:0;background:var(--bg);
     color:var(--ink);
-    font:15px/1.45 system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+    font:14px/1.45 system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
   }
-  .wrap{max-width:1200px;margin:24px auto 64px;padding:0 18px}
+
+  /* layout más centrado y con bolso arriba */
+  .wrap{max-width:980px;margin:10px auto 64px;padding:0 16px}
   .grid{
-    display:grid; gap:24px;
-    grid-template-columns: minmax(520px, 1fr) 430px;   /* bolso izq / panel dcha */
+    display:grid; gap:12px;
+    grid-template-columns: minmax(520px, 1fr) 360px;
     align-items:start;
   }
 
-  /* Lado izquierdo (escena) */
-  .stage{display:flex; align-items:flex-start; justify-content:flex-start}
-  /* Canvas: SIN borde blanco, proporción 600x800 visible, limpio */
-  #cv{display:block; width:600px; height:800px; border:0; border-radius:0; background:#fff0}
+  /* IZQUIERDA */
+  .stage{display:flex; align-items:flex-start; justify-content:flex-start; margin-top:-14px;}
+  #cv{display:block; width:600px; height:800px; border:0; background:#fff0}
 
-  /* Lado derecho (panel) */
-  .panel{display:flex; flex-direction:column; gap:16px}
-  .logo{display:block; width:120px; margin:6px auto 6px auto}
+  /* DERECHA */
+  .panel{display:flex; flex-direction:column; gap:14px}
+  .logo{display:block; width:120px; margin:4px auto 4px auto}
   h1{
-    margin:0 0 6px 0; text-align:center;
+    margin:0 0 8px 0; text-align:center;
     font-family: Didot, "Bodoni Moda", "Times New Roman", serif;
     font-weight:400; letter-spacing:.2px; font-size:28px;
   }
 
-  .card{
-    background:transparent; border:0; border-radius:14px; padding:0;
-  }
-  .row{display:grid; grid-template-columns: 1fr auto; align-items:center; gap:12px; margin:8px 0}
-  .label{font-size:13px; letter-spacing:.3px}
+  /* todo el bloque (menos logo y h1) un punto más pequeño */
+  .panel .card, .panel .form{font-size:0.92rem}
+
+  .card{background:transparent; border:0; border-radius:14px; padding:0}
+  .row{display:grid; grid-template-columns: 1fr auto; align-items:center; gap:10px; margin:6px 0}
+  .label{font-size:12px; letter-spacing:.3px}
+
+  /* selects más pequeños */
   select{
     appearance:none; border:1px solid var(--line); background:#fff; color:var(--ink);
-    padding:8px 10px; border-radius:12px; min-width:120px;
-    box-shadow:0 0 0 0 rgba(0,0,0,0);
+    padding:6px 10px; border-radius:12px; min-width:100px; font-size:12px;
   }
-  /* circulitos color más pequeños, redondos */
+
+  /* círculos de color pequeños */
   input[type="color"]{
-    -webkit-appearance:none; appearance:none; border:none; width:36px; height:36px;
-    border-radius:50%; padding:0; background:transparent; box-shadow:0 0 0 2px #fff, 0 0 0 1px var(--line);
+    -webkit-appearance:none; appearance:none; border:none; width:28px; height:28px;
+    border-radius:50%; padding:0; background:transparent;
+    box-shadow:0 0 0 2px #fff, 0 0 0 1px var(--line);
     cursor:pointer;
   }
 
-  .actions{display:flex; gap:12px; flex-wrap:wrap; margin-top:6px}
+  .actions{display:flex; gap:10px; flex-wrap:wrap; margin-top:6px}
   .btn{
-    cursor:pointer; border:none; border-radius:14px; padding:10px 14px;
-    background:var(--pill); color:#5a3b2f; font-weight:600;
+    cursor:pointer; border:none; border-radius:14px; padding:8px 12px;
+    background:var(--pill); color:#5a3b2f; font-weight:600; font-size:13px;
     box-shadow:0 1px 0 rgba(0,0,0,.05);
   }
   .btn:hover{background:var(--pillH)}
 
-  /* Formulario más limpio y con aire */
-  .form{
-    margin-top:8px; padding-top:8px; border-top:1px dashed var(--line);
-    display:grid; gap:10px;
-  }
+  /* Formulario con más aire entre celdas */
+  .form{margin-top:6px; padding-top:8px; border-top:1px dashed var(--line); display:grid; gap:10px}
   .grid2{display:grid; grid-template-columns:1fr 1fr; gap:10px}
   .input, .textarea{
     width:100%; border:1px solid var(--line); border-radius:12px;
-    padding:10px 12px; background:#fff; color:var(--ink);
+    padding:10px 12px; background:#fff; color:var(--ink); font-size:14px;
   }
   .textarea{min-height:88px; resize:vertical}
-  .consent{display:flex; align-items:center; gap:8px; font-size:13px; color:#7a5b4f}
+  .consent{display:flex; align-items:center; gap:8px; font-size:12px; color:#7a5b4f}
   .small{font-size:12px; opacity:.8}
 
-  /* Ajustes responsivos: en móvil todo centrado y apilado */
+  /* Móvil centrado y apilado */
   @media (max-width: 980px){
-    .grid{grid-template-columns:1fr; gap:22px}
-    .stage{justify-content:center}
+    .grid{grid-template-columns:1fr; gap:20px}
+    .stage{justify-content:center; margin-top:-8px}
     #cv{width:min(86vw, 520px); height:auto;}
     .panel{max-width:520px; margin:0 auto}
-    .logo{margin-top:0}
     h1{font-size:26px}
     .grid2{grid-template-columns:1fr}
   }
@@ -105,7 +105,6 @@
 
       <!-- IZQUIERDA: bolso -->
       <div class="stage">
-        <!-- canvas de 600x800 como requiere customizer.js -->
         <canvas id="cv" width="600" height="800"></canvas>
       </div>
 
@@ -128,7 +127,7 @@
             <input id="colA" type="color" value="#e6c0c3" aria-label="Color cuero 1">
           </div>
 
-          <div class="row" style="margin-top:6px">
+          <div class="row" style="margin-top:4px">
             <div class="label">2º CUERO · TEXTURA</div>
             <div></div>
           </div>
@@ -140,11 +139,7 @@
             <input id="colB" type="color" value="#7a4c3b" aria-label="Color cuero 2">
           </div>
 
-          <!-- Costura (C) – no mostramos etiqueta grande, solo selector (negro por defecto) -->
-          <div class="row" style="margin-top:8px">
-            <div class="label">Costura (C)</div>
-            <input id="stitchColor" type="color" value="#111111" aria-label="Color costura">
-          </div>
+          <!-- Costura ELIMINADA a petición -->
 
           <div class="actions">
             <button id="dl" class="btn">Descargar preview</button>
@@ -161,7 +156,8 @@
           </div>
           <div class="grid2">
             <input class="input" name="telefono" type="tel" placeholder="Teléfono" required>
-            <!-- Referencia de pedido eliminada como pediste -->
+            <!-- Referencia de pedido eliminada -->
+            <div></div>
           </div>
           <textarea class="textarea" name="notas" placeholder="Color interior, largo de correas, observaciones…"></textarea>
 
@@ -178,13 +174,12 @@
 
   <!-- libs -->
   <script src="https://cdn.jsdelivr.net/npm/fabric@5.3.0/dist/fabric.min.js"></script>
-  <!-- jsPDF para el PDF del pedido -->
   <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 
-  <!-- Tu lógica: NO tocamos nada; solo lo cargamos -->
+  <!-- Lógica del configurador (NO tocada) -->
   <script src="js/customizer.js"></script>
 
-  <!-- Generar PDF sin romper tu flujo -->
+  <!-- PDF (sin costura) + SW -->
   <script>
     const makePdfBtn = document.getElementById('makePdf');
     makePdfBtn.addEventListener('click', async () => {
@@ -192,39 +187,33 @@
         alert('Debes aceptar la política de privacidad para generar el PDF.');
         return;
       }
-
       const { jsPDF } = window.jspdf;
       const snap = (window.getWizardSnapshot && window.getWizardSnapshot()) || null;
 
-      // Datos del formulario
       const fd = new FormData(document.getElementById('orderForm'));
       const data = Object.fromEntries(fd.entries());
 
       const doc = new jsPDF({ unit:'mm', format:'a4' });
 
-      // Encabezado con logo
       const logo = new Image();
       logo.src = 'assets/img/logo-valonia.png';
       await new Promise(res => { logo.onload = res; logo.onerror = res; });
-      try{ doc.addImage(logo, 'PNG', 15, 12, 28, 28); }catch(e){ /* si falla, seguimos */ }
+      try{ doc.addImage(logo, 'PNG', 15, 12, 28, 28); }catch(e){}
 
       doc.setTextColor(60,45,38);
-      doc.setFont('Times', 'normal');
+      doc.setFont('Times','normal');
       doc.setFontSize(16);
       doc.text('Pedido personalizado — Tambour', 50, 20);
 
       let y = 30;
-
-      // Imagen preview (tu canvas es 600x800)
       if(snap && snap.png){
-        const w = 80, h = w * (800/600);         // mantiene proporción
+        const w = 80, h = w * (800/600);
         doc.addImage(snap.png, 'PNG', 15, y, w, h);
       }
 
-      // Bloque de datos y configuración
       y += 4;
-      doc.setFontSize(12);
       const xInfo = 110;
+      doc.setFontSize(12);
       doc.text('Datos del cliente', xInfo, y); y += 6;
       doc.setFontSize(11);
       doc.text(`Nombre: ${data.nombre || ''}`, xInfo, y); y += 5;
@@ -238,7 +227,7 @@
         const cfg = snap ? snap.config : {};
         doc.text(`1º cuero — textura: ${cfg?.A?.texture || ''} · color: ${cfg?.A?.color || ''}`, xInfo, y); y += 5;
         doc.text(`2º cuero — textura: ${cfg?.B?.texture || ''} · color: ${cfg?.B?.color || ''}`, xInfo, y); y += 5;
-        if(cfg?.C?.color){ doc.text(`Costura: ${cfg.C.color}`, xInfo, y); y += 5; }
+        /* Costura omitida */
       }catch(e){}
 
       y += 5;
@@ -251,7 +240,6 @@
       doc.save(`valonia-pedido-${stamp}.pdf`);
     });
 
-    /* PWA: registrar SW (silencioso) */
     if('serviceWorker' in navigator){
       window.addEventListener('load', ()=> {
         navigator.serviceWorker.register('./sw.js').catch(()=>{});
