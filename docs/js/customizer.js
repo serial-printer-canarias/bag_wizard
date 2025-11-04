@@ -29,46 +29,32 @@
   let imgSmooth=null, imgSuede=null;
 
   // ---------- helpers ----------
-  // bounding box "real" usando las esquinas absolutas de cada hoja (sin depender del viewBox)
-  function tightBounds(root){
-    root.setCoords();
-    let minX= Infinity, minY= Infinity, maxX=-Infinity, maxY=-Infinity;
-    const push = (x,y)=>{ if(x<minX)minX=x; if(y<minY)minY=y; if(x>maxX)maxX=x; if(y>maxY)maxY=y; };
-    leafs(root).forEach(o=>{
-      o.setCoords();
-      const a=o.aCoords; if(!a) return;
-      push(a.tl.x,a.tl.y); push(a.tr.x,a.tr.y);
-      push(a.bl.x,a.bl.y); push(a.br.x,a.br.y);
-    });
-    const w=Math.max(1,maxX-minX), h=Math.max(1,maxY-minY);
-    return {x:minX,y:minY,w,h,cx:minX+w/2,cy:minY+h/2};
-  }
-
-  // AJUSTE NUEVO: mantiene proporción, usa caja real y centra
+  // VOLVEMOS a ajustar con las dimensiones nativas del grupo (viewBox),
+  // manteniendo proporción y centrando. Esto respeta tu SVG tal cual lo dejaste.
   function fit(g){
-    const M = Math.max(24, Math.round(Math.min(W,H)*0.06)); // margen limpio
-    const maxW = W - 2*M, maxH = H - 2*M;
-    const FILL = 1.00; // 1.00 apura; <1 más aire; >1 recorta margen
+    const isMob = window.matchMedia('(max-width: 768px)').matches;
+    const PAD       = isMob ? 18 : 26;     // margen limpio
+    const FILL_MOB  = 0.92;                // ocupa un 92% del alto/ancho útil en móvil
+    const FILL_DESK = 0.88;                // ocupa ~88% en desktop (como en tu foto)
+    const FILL = isMob ? FILL_MOB : FILL_DESK;
 
-    // 1) medir con escala/posición actuales
-    let bb = tightBounds(g);
+    const maxW = W - 2*PAD;
+    const maxH = H - 2*PAD;
 
-    // 2) factor para encajar la caja real
-    const k = Math.min(maxW/bb.w, maxH/bb.h) * FILL;
+    // medimos en escala 1 usando el tamaño nativo del grupo (viewBox)
+    g.set({ scaleX:1, scaleY:1, left:0, top:0 });
+    const w = g.width  || g.getScaledWidth();
+    const h = g.height || g.getScaledHeight();
 
-    // escalar alrededor de su centro (no de la esquina) para no desplazar raro
-    const prevScaleX = g.scaleX || 1, prevScaleY = g.scaleY || 1;
-    const mul = k; // bb ya está en coords de canvas (incluye escala actual)
-    g.scaleX = prevScaleX * mul;
-    g.scaleY = prevScaleY * mul;
+    const s = Math.min(maxW/w, maxH/h) * FILL;
 
-    // 3) recalcular caja y centrarla en el canvas
-    g.setCoords();
-    bb = tightBounds(g);
-    const dx = (W/2) - bb.cx;
-    const dy = (H/2) - bb.cy;
-    g.left = (g.left||0) + dx;
-    g.top  = (g.top ||0) + dy;
+    g.scale(s);
+    g.set({
+      left:(W - w*s)/2,
+      top :(H - h*s)/2,
+      selectable:false,
+      evented:false
+    });
     g.setCoords();
   }
 
@@ -334,16 +320,25 @@
 
   Promise.all([loadImg(TX.smooth), loadImg(TX.suede)]).then(([a,b])=>{ imgSmooth=a; imgSuede=b; });
 
-  fabric.loadSVGFromURL(SVG,(objs,opts)=>{
-    const root=fabric.util.groupSVGElements(objs,opts);
-    canvas.add(root);
-    fit(root); // ← encaje con proporción y centrado reales
+  let rootObj=null;
 
-    collectStitch(root);
-    styleAndCollectOutlines(root);
-    buildBuckets(root);
+  fabric.loadSVGFromURL(SVG,(objs,opts)=>{
+    rootObj=fabric.util.groupSVGElements(objs,opts);
+    canvas.add(rootObj);
+    fit(rootObj); // ← encaje según viewBox/nativo (como en tu foto)
+
+    collectStitch(rootObj);
+    styleAndCollectOutlines(rootObj);
+    buildBuckets(rootObj);
     paint();
   },(item,obj)=>{ obj.selectable=false; });
+
+  // reencajar al cambiar tamaño de ventana
+  window.addEventListener('resize', ()=>{
+    if(!rootObj) return;
+    fit(rootObj);
+    canvas.requestRenderAll();
+  });
 
   // UI
   ['change','input'].forEach(ev=>{
@@ -373,7 +368,7 @@
     });
   }
 
-  // Snapshot para formulario (sin tocar lógica)
+  // Snapshot para formulario
   window.getWizardSnapshot = function(){
     const cfg = {
       model:'bucket-01',
