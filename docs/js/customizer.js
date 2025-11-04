@@ -14,9 +14,10 @@
     dl:$('#dl'), save:$('#save'), hidden:$('#spbc_config_json')
   };
 
-  const W=600,H=800;
-  const canvas=new fabric.Canvas('cv',{selection:false});
-  canvas.setWidth(W); canvas.setHeight(H);
+  // Canvas base
+  const canvas=new fabric.Canvas('cv',{ selection:false });
+  // Medidas por defecto (fallback)
+  let W=600, H=800;
 
   // Debug
   const dbg=document.createElement('div');
@@ -27,28 +28,49 @@
   let mode=''; let bucketA=[], bucketB=[];
   let outlineSet=new Set(); let stitchSet=new Set();
   let imgSmooth=null, imgSuede=null;
+  let rootObj=null; // guardamos el grupo SVG para reencajar en resize
 
   // ---------- helpers ----------
+  function syncCanvasToCSS(){
+    // Lee tamaño real del canvas en pantalla para evitar deformaciones por CSS
+    const el = canvas.getElement();
+    const cssW = Math.max(50, el.clientWidth || W);
+    const cssH = Math.max(50, el.clientHeight || H);
+    const dpr  = window.devicePixelRatio || 1;
+
+    // Igualamos el “backing store” al tamaño visible para que no lo estire el navegador
+    canvas.setDimensions({ width: cssW * dpr, height: cssH * dpr });
+    canvas.setViewportTransform([dpr,0,0,dpr,0,0]);
+    // Actualizamos referencias W/H
+    W = cssW; H = cssH;
+
+    if(rootObj){ fit(rootObj); canvas.requestRenderAll(); }
+  }
+
   function fit(g){
-    // Más aire y escala UNIFORME para evitar deformaciones
-    const M = Math.max(36, Math.round(Math.min(W, H) * 0.10)); // ~10% margen
-    const maxW = W - 2*M, maxH = H - 2*M;
+    // Márgenes y escala UNIFORME (proporciones originales)
+    const M = Math.max(28, Math.round(Math.min(W,H)*0.08)); // ~8% de margen
+    const maxW = W - 2*M;
+    const maxH = H - 2*M;
 
-    // Dimensiones "crudas" del grupo (sin depender de escalas previas)
-    const w0 = g.width || g.getScaledWidth();
-    const h0 = g.height || g.getScaledHeight();
+    // Dimensiones sin depender de escalas previas
+    // Usamos bounding rect para ser inmunes a escalas internas
+    const r0 = g.getBoundingRect(true,true);
+    const w0 = r0.width;
+    const h0 = r0.height;
 
-    // Escala base para encajar y un extra para que arranque más pequeño
     const base = Math.min(maxW / w0, maxH / h0);
-    const EXTRA = 0.78; // ≈ 22% más pequeño (ajustable)
+    const EXTRA = 0.70; // más pequeño de inicio (≈30% extra de aire)
     const s = base * EXTRA;
 
-    // Forzar escala uniforme y centrar
-    g.set({ scaleX:s, scaleY:s });
+    // Escala uniforme SIEMPRE
+    g.set({ scaleX:s, scaleY:s, originX:'left', originY:'top' });
+
+    // Recalculamos bbox ya escalado para centrar
     const w = w0 * s, h = h0 * s;
     g.set({
-      left:(W - w)/2,
-      top:(H - h)/2,
+      left: (W - w)/2,
+      top:  (H - h)/2,
       selectable:false,
       evented:false
     });
@@ -315,33 +337,39 @@
     canvas.requestRenderAll();
   }
 
+  // Cargar texturas
   Promise.all([loadImg(TX.smooth), loadImg(TX.suede)]).then(([a,b])=>{ imgSmooth=a; imgSuede=b; });
 
+  // Cargar SVG
   fabric.loadSVGFromURL(SVG,(objs,opts)=>{
-    const root=fabric.util.groupSVGElements(objs,opts);
-    fit(root); canvas.add(root);
+    rootObj=fabric.util.groupSVGElements(objs,opts);
+    // aseguramos estado limpio antes de medir
+    rootObj.set({ scaleX:1, scaleY:1, left:0, top:0 });
+    canvas.add(rootObj);
 
-    collectStitch(root);
-    styleAndCollectOutlines(root);
-    buildBuckets(root);
+    // Sincroniza tamaños reales del canvas y encaja
+    syncCanvasToCSS();
+
+    collectStitch(rootObj);
+    styleAndCollectOutlines(rootObj);
+    buildBuckets(rootObj);
     paint();
   },(item,obj)=>{ obj.selectable=false; });
 
   // UI
   ['change','input'].forEach(ev=>{
-    ui.colA.addEventListener(ev, paint);
-    ui.colB.addEventListener(ev, paint);
-    ui.texA.addEventListener(ev, paint);
-    ui.texB.addEventListener(ev, paint);
-    if(ui.stitch) ui.stitch.addEventListener(ev, paint);
+    ui.colA?.addEventListener(ev, paint);
+    ui.colB?.addEventListener(ev, paint);
+    ui.texA?.addEventListener(ev, paint);
+    ui.texB?.addEventListener(ev, paint);
+    ui.stitch?.addEventListener(ev, paint);
   });
 
-  ui.dl.addEventListener('click', ()=>{
+  ui.dl?.addEventListener('click', ()=>{
     const data=canvas.toDataURL({format:'png',multiplier:1.5});
     const a=document.createElement('a'); a.href=data; a.download='bolso-preview.png'; a.click();
   });
 
-  /* ← guardia para no romper si “Ver JSON” no existe */
   if(ui.save){
     ui.save.addEventListener('click', ()=>{
       ui.hidden.value = JSON.stringify({
@@ -356,7 +384,7 @@
     });
   }
 
-  // Snapshot para el formulario
+  // Snapshot para formulario
   window.getWizardSnapshot = function(){
     const cfg = {
       model:'bucket-01',
@@ -369,4 +397,9 @@
     const png = canvas.toDataURL({ format:'png', multiplier: 1.5 });
     return { png, config: cfg };
   };
+
+  // Re‐encajar en resize (evita estiramientos en móvil/escritorio)
+  window.addEventListener('resize', syncCanvasToCSS);
+  // Por si el canvas ya tiene tamaño CSS al llegar aquí
+  setTimeout(syncCanvasToCSS, 0);
 })();
