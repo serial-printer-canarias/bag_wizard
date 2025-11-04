@@ -9,10 +9,10 @@
   :root{
     --bg:#f7f7f9; --ink:#221E1B; --terra:#8C5A45; --rose:#E7BFC2; --line:#eaeaea;
     --rightCol: 420px;
-    --gap-logo-title: 38px;   /* ↑ más aire: logo ↔ título */
+    --gap-logo-title: 40px;   /* MÁS aire entre logo y título */
     --gap-title-options: 16px;/* título ↔ opciones */
-    --desk-gap: 18px;         /* ↓ más cerca del bolso */
-    --nudge-left: -8px;       /* pequeño “empuje” del bloque hacia el bolso */
+    --desk-gap: 14px;         /* columna derecha MÁS cerca del bolso */
+    --nudge-left: -30px;      /* empujar bloque hacia el centro (izquierda) */
     --m-gap: 22px;
   }
 
@@ -25,7 +25,7 @@
   html,body{margin:0;background:var(--bg);color:var(--ink)}
   body{font:15px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif}
 
-  .wrap{max-width:1200px;margin:0 auto;padding:0 18px 34px}
+  .wrap{max-width:1180px;margin:0 auto;padding:0 18px 34px}
   .grid{
     display:grid;
     grid-template-columns:minmax(340px,1fr) var(--rightCol);
@@ -33,15 +33,15 @@
     align-items:start;
   }
 
-  /* Canvas más pequeño para que entre entero */
+  /* Canvas: aún más pequeño para que se vea entero sin scroll */
   .stage{display:flex;justify-content:flex-start;align-items:flex-start}
   #cv{
     display:block;background:transparent;border:none;border-radius:0;
-    width:clamp(320px, 44vw, 640px);  /* ↓ antes 50vw/680px */
+    width:clamp(300px, 40vw, 600px);  /* ↓ antes 44vw/640 */
     height:auto;margin-top:4px;
   }
 
-  /* Bloque derecho compacto, centrado entre sí y más pegado a la izquierda */
+  /* Bloque: centrado entre sí, más pegado al bolso y desplazado hacia el centro */
   .side{
     display:flex;flex-direction:column;align-items:center;text-align:center;
     gap:var(--gap-title-options);align-self:center;margin-left:var(--nudge-left);
@@ -68,7 +68,7 @@
   .actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:6px}
   button{cursor:pointer;border-radius:12px;padding:9px 14px;font-weight:600;border:1px solid var(--line);background:var(--rose);color:#5a3a2c}
 
-  /* Formulario limpio */
+  /* Formulario (sin cambios) */
   .order{max-width:980px;margin:40px auto 0;background:transparent;border:none;padding:0}
   .order h2{
     margin:0 0 20px 0;
@@ -82,12 +82,12 @@
   .order textarea{min-height:124px;resize:vertical}
   .small{font-size:12px;color:#7a7a7a}
 
-  /* Móvil: bloques separados y centrados: logo → bolso → opciones → formulario */
+  /* Móvil: centrado y separado por bloques */
   @media (max-width:980px){
     .grid{grid-template-columns:1fr;gap:var(--m-gap);justify-items:center}
     #cv{width:min(92vw,520px)}
     .side{gap:22px;margin-left:0}
-    .brand{gap:24px}
+    .brand{gap:26px}
     .order{margin:34px 16px 0}
     .form-grid{grid-template-columns:1fr}
     .order h2{text-align:center}
@@ -98,10 +98,12 @@
 
   <div class="wrap">
     <div class="grid">
+      <!-- Izquierda: bolso -->
       <div class="stage">
         <canvas id="cv" width="600" height="800"></canvas>
       </div>
 
+      <!-- Derecha: bloque compacto (logo + título + opciones) -->
       <aside class="side">
         <div class="brand">
           <img src="assets/img/logo-valonia.png" alt="Valonia">
@@ -138,6 +140,7 @@
       </aside>
     </div>
 
+    <!-- Formulario -->
     <section class="order">
       <h2>Datos para tu pedido</h2>
       <form id="orderForm">
