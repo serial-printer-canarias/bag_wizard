@@ -10,68 +10,60 @@
   const ui={
     texA:$('#texA'), colA:$('#colA'),
     texB:$('#texB'), colB:$('#colB'),
+    // --- Grupo C (costura) ---
     stitch: $('#stitchColor'),
     dl:$('#dl'), save:$('#save'), hidden:$('#spbc_config_json')
   };
 
-  // Canvas fabric + referencia DOM del canvas
-  const elCanvas = $('#cv');
-  const canvas=new fabric.Canvas('cv',{selection:false});
-
-  // Backups por compatibilidad con cálculos de área
   const W=600,H=800;
+  const canvas=new fabric.Canvas('cv',{selection:false});
+  canvas.setWidth(W); canvas.setHeight(H);
 
-  // Debug badge
+  // Debug
   const dbg=document.createElement('div');
   Object.assign(dbg.style,{position:'fixed',top:'8px',right:'8px',background:'rgba(0,0,0,.85)',color:'#fff',
     padding:'8px 10px',font:'12px/1.35 system-ui,Segoe UI,Roboto,Arial',borderRadius:'10px',zIndex:9999,maxWidth:'48ch'});
   dbg.textContent='Cargando…'; document.body.appendChild(dbg);
 
-  let mode=''; let bucketA=[], bucketB=[];
-  let outlineSet=new Set(); let stitchSet=new Set();
+  let mode=''; // 'ids' | 'auto-mix' | 'auto-geom'
+  let bucketA=[], bucketB=[];
+  let outlineSet=new Set(); // hojas que son contorno/detalle
+  // --- Grupo C (costura) ---
+  let stitchSet=new Set();
+
   let imgSmooth=null, imgSuede=null;
-  let rootObj=null; // grupo raiz de la ilustración
 
-  // ---------- SINCRONÍA CANVAS <-> CSS (sin deformaciones) ----------
-  function syncCanvasToCSS(){
-    // Tamaño que realmente ocupa el canvas en pantalla (definido por CSS con aspect-ratio 3/4)
-    const cssW = Math.max(300, elCanvas.clientWidth || 600);
-    const cssH = Math.max(400, elCanvas.clientHeight || Math.round(cssW*4/3));
-    const dpr  = Math.max(1, Math.floor(window.devicePixelRatio || 1));
-
-    // Backstore (pixeles reales) y CSS (pixeles lógicos)
-    canvas.setDimensions({ width: cssW*dpr, height: cssH*dpr }, { backstoreOnly:true });
-    canvas.setDimensions({ width: cssW,    height: cssH    }, { cssOnly:true });
-    canvas.setZoom(dpr);
-  }
-
-  // ---------- encaje de la ilustración (respeta proporción 100%) ----------
+  // ---------- helpers ----------
+  // *** ÚNICO CAMBIO IMPORTANTE: fit() ***
   function fit(g){
-    const isMob = matchMedia('(max-width: 768px)').matches;
-    const PAD = isMob ? 10 : 16;
+    // porcentaje del ancho del canvas que debe ocupar el bolso
+    // (ajusta si lo quieres un poco más grande/pequeño)
+    const TARGET_W_RATIO = 0.52; // 52% del ancho visible
 
-    const canvasW = canvas.getWidth();
-    const canvasH = canvas.getHeight();
-    const maxW = canvasW - 2*PAD;
-    const maxH = canvasH - 2*PAD;
+    const pad = 20;
+    const maxW = W - 2*pad;
+    const maxH = H - 2*pad;
 
-    // normalizamos a escala 1 para medir
+    // medir tamaño NATURAL del grupo (sin escala)
     g.set({ scaleX:1, scaleY:1, left:0, top:0 }); g.setCoords();
     const r0 = g.getBoundingRect(true,true);
-    const w0 = Math.max(1, r0.width), h0 = Math.max(1, r0.height);
+    const w0 = Math.max(1, r0.width);
+    const h0 = Math.max(1, r0.height);
 
-    // objetivo: ocupar ~45% del ancho útil en desktop y ~60% en móvil
-    const TARGET_W = (isMob ? 0.60 : 0.45) * maxW;
-    let s = TARGET_W / w0;
-    if (h0*s > maxH) s = maxH / h0; // nunca superar alto disponible
+    // escalar para que el ancho final sea el % pedido, sin pasar del alto disponible
+    let s = (TARGET_W_RATIO * maxW) / w0;
+    if (h0 * s > maxH) s = maxH / h0;
 
-    g.scale(s);
-    const w = w0*s, h = h0*s;
-    g.set({ left:(canvasW - w)/2, top:(canvasH - h)/2, selectable:false, evented:false });
+    // aplicar escala proporcional y centrar
+    const w = w0 * s;
+    const h = h0 * s;
+    g.set({ scaleX:s, scaleY:s,
+            left: (W - w)/2,
+            top:  (H - h)/2,
+            selectable:false, evented:false });
     g.setCoords();
   }
 
-  // ---------- helpers varios ----------
   function walk(arr,fn){ (function rec(a){ a.forEach(o=>{ fn(o); if(o._objects&&o._objects.length) rec(o._objects); }); })(arr); }
   function leafs(root){ const out=[]; walk([root], o=>{ if(o._objects&&o._objects.length) return; if(o.type==='image') return; out.push(o); }); return out; }
   function idsMap(arr){ const map={}; walk(arr,o=>{ if(o.id) map[o.id]=o; }); return map; }
@@ -80,6 +72,7 @@
     const arr=parent._objects, idx=arr.indexOf(child);
     if(idx>=0){ arr.splice(idx,1); arr.push(child); parent.dirty=true; }
   }
+
   const getW=o=>typeof o.getScaledWidth==='function'?o.getScaledWidth(): (o.width||0);
   const getH=o=>typeof o.getScaledHeight==='function'?o.getScaledHeight(): (o.height||0);
   const bboxArea=o=>Math.max(1,getW(o)*getH(o));
@@ -115,6 +108,7 @@
   }
   function hasStroke(o){ return ('stroke' in o) && o.stroke && o.stroke!=='none'; }
 
+  // Heurística de contorno:
   function isOutlineStroke(o){
     if(hasVisibleFill(o)) return false;
     if(!hasStroke(o)) return false;
@@ -215,7 +209,7 @@
   }
   const applyFill=(o,mat)=>{ if('fill' in o) o.set('fill',mat); else o.fill=mat; };
 
-  // --------- OUTLINE ----------
+  // --------- OUTLINE: detectar y fijar estilo ----------
   function styleAndCollectOutlines(root){
     outlineSet=new Set();
     const areaRoot = (root.getScaledWidth?.()||getW(root)) * (root.getScaledHeight?.()||getH(root)) || (W*H);
@@ -250,7 +244,7 @@
     });
   }
 
-  // --------- COSTURA ----------
+  // --------- STITCH: detectar grupo de costura (C) y fijar estilo base ----------
   function collectStitch(root){
     stitchSet = new Set();
     const ids=idsMap(root._objects?root._objects:[root]);
@@ -260,23 +254,28 @@
     const leaves = leafs(gStitch);
     leaves.forEach(o=>{
       stitchSet.add(o);
+      // estilo base de puntada (solo trazo)
       o.set({
-        fill:'none',
-        stroke: ui.stitch?.value || '#111111',
+        fill: 'none',
+        stroke: ui.stitch?.value || '#2a2a2a',
         strokeWidth: 1.4,
-        strokeLineCap:'round', strokeLineJoin:'round',
-        strokeUniform:true, opacity:1
+        strokeLineCap: 'round',
+        strokeLineJoin: 'round',
+        strokeUniform: true,
+        opacity: 1
       });
       if(o.group) bringChildToTop(o.group,o);
     });
     const parent = gStitch.group || root; bringChildToTop(parent, gStitch);
   }
 
-  // --------- BUCKETS ----------
+  // --------- buckets pintables ----------
   function buildBuckets(root){
     const allLeaves = leafs(root);
+    // NO pintar outline ni costura
     const paintables = allLeaves.filter(o=>!outlineSet.has(o) && !stitchSet.has(o));
 
+    // 1) ids stripe1/stripe2
     const ids=idsMap(root._objects?root._objects:[root]);
     if(ids['stripe1'] && ids['stripe2']){
       const A=leafs(ids['stripe1']).filter(o=>!outlineSet.has(o) && !stitchSet.has(o));
@@ -288,6 +287,7 @@
       }
     }
 
+    // 2) color+posición
     const mix=kmeans2_mix(paintables);
     if(mix.A.length && mix.B.length){
       bucketA=mix.A; bucketB=mix.B; mode='auto-mix';
@@ -295,12 +295,13 @@
       return;
     }
 
+    // 3) geom por X
     const [AX,BX]=kmeans2X(paintables);
     bucketA=AX; bucketB=BX; mode='auto-geom';
     dbg.innerHTML=`✅ SVG cargado (modo <b>auto-geom</b>) · A: ${AX.length} · B: ${BX.length} · stitch: ${stitchSet.size} · outline: ${outlineSet.size}`;
   }
 
-  // --------- PINTADO ----------
+  // --------- pintado ----------
   function paint(){
     const colA=ui.colA.value||'#e6e6e6', colB=ui.colB.value||'#c61a1a';
     const patA=tintPattern(ui.texA.value==='suede'?imgSuede:imgSmooth, colA);
@@ -309,6 +310,7 @@
     bucketA.forEach(o=>{ applyFill(o, patA); o.dirty=true; });
     bucketB.forEach(o=>{ applyFill(o, patB); o.dirty=true; });
 
+    // reafirmar contorno encima y negro
     outlineSet.forEach(o=>{
       if(hasStroke(o) || !hasVisibleFill(o)){
         o.set({fill:'none', stroke:'#111'});
@@ -319,8 +321,9 @@
       o.dirty=true;
     });
 
+    // --- pintar costura (C) como color liso de trazo ---
     if(ui.stitch){
-      const sc = ui.stitch.value || '#111111';
+      const sc = ui.stitch.value || '#2a2a2a';
       stitchSet.forEach(o=>{
         o.set({ fill:'none', stroke: sc, opacity:1 });
         if(o.group) bringChildToTop(o.group,o);
@@ -331,69 +334,55 @@
     canvas.requestRenderAll();
   }
 
-  // Carga texturas
   Promise.all([loadImg(TX.smooth), loadImg(TX.suede)]).then(([a,b])=>{ imgSmooth=a; imgSuede=b; });
-
-  // Sincroniza dimensiones antes de cargar el SVG
-  syncCanvasToCSS();
 
   fabric.loadSVGFromURL(SVG,(objs,opts)=>{
     const root=fabric.util.groupSVGElements(objs,opts);
-    rootObj = root;
-
-    // tamaño/posicion inicial correctos
     fit(root); canvas.add(root);
 
+    // --- nuevo: detectar y configurar costura (C) ---
     collectStitch(root);
+    // existente: contornos
     styleAndCollectOutlines(root);
+    // buckets A/B (excluyen outline y costura)
     buildBuckets(root);
     paint();
   },(item,obj)=>{ obj.selectable=false; });
 
-  // Reajuste al cambiar colores/texturas
+  // UI
   ['change','input'].forEach(ev=>{
     ui.colA.addEventListener(ev, paint);
     ui.colB.addEventListener(ev, paint);
     ui.texA.addEventListener(ev, paint);
     ui.texB.addEventListener(ev, paint);
-    if(ui.stitch) ui.stitch.addEventListener(ev, paint);
+    if(ui.stitch) ui.stitch.addEventListener(ev, paint); // Grupo C
   });
 
-  // Redimensiona en vivo (móvil ↔ escritorio, ancho contenedor, etc.)
-  window.addEventListener('resize', ()=>{
-    syncCanvasToCSS();
-    if(rootObj){ fit(rootObj); canvas.requestRenderAll(); }
-  });
-
-  // Descargar PNG
-  ui.dl?.addEventListener('click', ()=>{
+  ui.dl.addEventListener('click', ()=>{
     const data=canvas.toDataURL({format:'png',multiplier:1.5});
     const a=document.createElement('a'); a.href=data; a.download='bolso-preview.png'; a.click();
   });
-
-  // “Ver JSON” (si lo usas)
-  if(ui.save){
-    ui.save.addEventListener('click', ()=>{
-      ui.hidden.value = JSON.stringify({
-        model:'bucket-01',
-        mode,
-        A:{ texture: ui.texA.value, color: ui.colA.value },
-        B:{ texture: ui.texB.value, color: ui.colB.value },
-        C:{ texture:'none', color: ui.stitch ? ui.stitch.value : '#111111' },
-        version:'1.0.1'
-      });
-      alert(ui.hidden.value);
+  ui.save?.addEventListener('click', ()=>{
+    ui.hidden.value = JSON.stringify({
+      model:'bucket-01',
+      mode,
+      A:{ texture: ui.texA.value, color: ui.colA.value },
+      B:{ texture: ui.texB.value, color: ui.colB.value },
+      // Grupo C (costura)
+      C:{ texture:'none', color: ui.stitch ? ui.stitch.value : '#2a2a2a' },
+      version:'1.0.1'
     });
-  }
+    alert(ui.hidden.value);
+  });
 
-  // Snapshot para el formulario / PDF
+  // --- Exponer snapshot para el formulario (no altera la lógica) ---
   window.getWizardSnapshot = function(){
     const cfg = {
       model:'bucket-01',
       mode,
       A:{ texture: ui.texA.value, color: ui.colA.value },
       B:{ texture: ui.texB.value, color: ui.colB.value },
-      C:{ texture:'none', color: ui.stitch ? ui.stitch.value : '#111111' },
+      C:{ texture:'none', color: ui.stitch ? ui.stitch.value : '#2a2a2a' },
       version:'1.0.1'
     };
     const png = canvas.toDataURL({ format:'png', multiplier: 1.5 });
