@@ -5,47 +5,58 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Bag Wizard · Valonia</title>
 <style>
-  :root{--bg:#f7f7f9;--panel:#fff;--line:#e6e6e9;--rose:#e7b7b8;--terra:#7a4e3a}
+  :root{
+    --bg:#f7f7f9; --panel:#fff; --line:#e6e6e9;
+    --rose:#e7b7b8; --terra:#7a4e3a; --txt:#222;
+  }
   *{box-sizing:border-box}
-  body{margin:0;background:var(--bg);font:15px/1.45 system-ui,Segoe UI,Roboto,Arial,sans-serif;color:#222}
-  .wrap{max-width:1100px;margin:24px auto;padding:0 16px}
-  h1{font:400 24px/1.4 "Didot", "Bodoni", serif;color:var(--terra);text-align:center;margin:0 0 10px}
-  .grid{display:grid;grid-template-columns:1fr 380px;gap:28px;align-items:start}
-  .box{background:var(--panel);border:1px solid var(--line);border-radius:12px}
-  .stage{padding:0;border:none;background:transparent}
-  .panel{padding:14px}
-  .row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:6px 0}
-  label{display:inline-flex;align-items:center;gap:8px;color:#7b5d4c;font-size:13px;letter-spacing:.02em}
-  button{cursor:pointer;padding:8px 12px;border-radius:10px;border:1px solid var(--line);background:#fff}
-  /* >>> CANVAS: nunca forces width+height distintos. Mantén proporción 3/4 y que el JS ponga el backstore. */
+  body{margin:0;background:var(--bg);color:var(--txt);font:15px/1.45 system-ui,Segoe UI,Roboto,Arial,sans-serif}
+  .wrap{max-width:1200px;margin:24px auto;padding:0 18px}
+  .grid{
+    display:grid; grid-template-columns:minmax(300px,1fr) 420px; gap:28px; align-items:start;
+  }
+  .stage{background:transparent; border:none; padding:0}
+  .panel{background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:16px}
+  .brand{display:flex; flex-direction:column; align-items:center; gap:8px; margin:8px 0 10px}
+  .brand img{width:84px; height:auto; display:block}
+  .title{font:400 24px/1.3 "Didot","Bodoni",serif; color:var(--terra); text-align:center}
+  .row{display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin:8px 0}
+  label{display:inline-flex; align-items:center; gap:8px; color:#7b5d4c; font-size:13px; letter-spacing:.02em}
+  input[type="color"]{inline-size:36px; block-size:36px; padding:0; border-radius:12px; border:1px solid var(--line)}
+  select{height:36px; border:1px solid var(--line); border-radius:10px; padding:0 8px; background:#fff}
+  button{cursor:pointer; padding:10px 14px; border-radius:12px; border:1px solid var(--rose); background:var(--rose); color:#553f37}
+
+  /* ——— Canvas: NUNCA forzamos distorsión. El backstore lo ajusta JS. */
   #cv{
-    width:100%;           /* el ancho lo pone el contenedor */
-    aspect-ratio: 3 / 4;  /* alto calculado automáticamente manteniendo proporción */
-    height:auto;
-    display:block;
-    border:none;          /* sin borde */
-    background:transparent;
-    border-radius:12px;
+    width:100%;                /* ancho fluido del contenedor */
+    aspect-ratio: 3 / 4;        /* alto automático manteniendo proporción */
+    height:auto; display:block; background:transparent; border:none; border-radius:12px;
   }
 
   /* móvil */
   @media (max-width: 900px){
-    .grid{grid-template-columns:1fr;gap:16px}
+    .grid{grid-template-columns:1fr; gap:18px}
+    .panel{padding:14px}
+    .brand img{width:72px}
+    .title{font-size:22px}
   }
 </style>
 </head>
 <body>
   <div class="wrap">
-
     <div class="grid">
-      <!-- LADO IZQUIERDO: SOLO el canvas -->
+      <!-- IZQUIERDA: escenario del bolso -->
       <div class="stage">
+        <!-- width/height iniciales sirven de backstore; JS los re-sincroniza sin deformar -->
         <canvas id="cv" width="600" height="800"></canvas>
       </div>
 
-      <!-- LADO DERECHO: controles -->
-      <div class="box panel">
-        <h1>Diseña tu Tambour</h1>
+      <!-- DERECHA: UI Valonia -->
+      <div class="panel">
+        <div class="brand">
+          <img src="assets/logo-valonia.png" alt="Valonia">
+          <div class="title">Diseña tu Tambour</div>
+        </div>
 
         <div class="row">
           <label>1º CUERO · TEXTURA
@@ -67,20 +78,19 @@
           <input id="colB" type="color" value="#7a4e3a">
         </div>
 
+        <!-- Costura visible en render pero sin campo en UI (pediste ocultarlo) -->
         <div class="row" style="display:none">
           <label>Costura (C)</label>
           <input id="stitchColor" type="color" value="#111111">
         </div>
 
         <div class="row">
-          <button id="dl" style="background:#e7b7b8;border-color:#e7b7b8">Descargar preview</button>
+          <button id="dl">Descargar preview</button>
           <button id="save" style="display:none">Ver JSON</button>
           <input type="hidden" id="spbc_config_json">
         </div>
       </div>
     </div>
-
-    <!-- FORMULARIO (si lo usas) quítale bordes en tu CSS del tema -->
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/fabric@5.3.0/dist/fabric.min.js"></script>
