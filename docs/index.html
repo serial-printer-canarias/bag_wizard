@@ -14,8 +14,10 @@
     --gap-title-options: 16px;  /* título ↔ opciones */
 
     --desk-gap: 0px;            /* sin hueco entre columnas */
-    /* empuje más fuerte hacia el bolso (más negativo = más cerca) */
-    --nudge-left: clamp(-220px, -15vw, -160px);
+    /* acercar bloque al centro/bolso (más negativo = más cerca) */
+    --nudge-left: clamp(-280px, -19vw, -210px);
+    /* subir ligeramente el bloque derecho */
+    --nudge-top: -18px;
 
     --m-gap: 22px;              /* separaciones en móvil */
   }
@@ -37,20 +39,21 @@
     align-items:start;
   }
 
-  /* Canvas más pequeño para que entre entero sin scroll */
+  /* Canvas: ~20% más pequeño para que quepa entero sin scroll */
   .stage{display:flex;justify-content:flex-start;align-items:flex-start}
   #cv{
     display:block;background:transparent;border:none;border-radius:0;
-    width:clamp(220px, 26vw, 420px); /* ↓ más pequeño que antes */
+    width:clamp(200px, 21vw, 360px);  /* ↓ antes 26vw/420px */
     height:auto;margin-top:4px;
   }
 
-  /* Bloque derecho compacto, centrado entre sí y MUY pegado al bolso */
+  /* Bloque derecho compacto, centrado entre sí, más cerca del centro y un poco más arriba */
   .side{
     display:flex;flex-direction:column;align-items:center;text-align:center;
     gap:var(--gap-title-options);
     align-self:center;
-    margin-left:var(--nudge-left); /* acerca el bloque hacia el bolso */
+    margin-left:var(--nudge-left);   /* hacia el centro/bolso */
+    margin-top:var(--nudge-top);     /* un poco más arriba */
   }
   .brand{
     display:flex;flex-direction:column;align-items:center;text-align:center;
@@ -96,11 +99,11 @@
   .order textarea{min-height:124px;resize:vertical}
   .small{font-size:12px;color:#7a7a7a}
 
-  /* Móvil: centrado y ordenado por bloques (sin empuje lateral) */
+  /* Móvil: centrado y ordenado por bloques */
   @media (max-width:980px){
     .grid{grid-template-columns:1fr;gap:var(--m-gap);justify-items:center}
-    #cv{width:min(92vw,460px)}
-    .side{gap:22px;margin-left:0}
+    #cv{width:min(92vw,440px)}
+    .side{gap:22px;margin-left:0;margin-top:0}
     .brand{gap:26px}
     .order{margin:34px 16px 0}
     .form-grid{grid-template-columns:1fr}
