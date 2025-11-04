@@ -14,9 +14,21 @@
     dl:$('#dl'), save:$('#save'), hidden:$('#spbc_config_json')
   };
 
-  const W=600,H=800;
+  // --- Tamaños compactos y responsivos (iPad horizontal sin scroll)
+  let W=560, H=740;          // base (antes 600x800)
   const canvas=new fabric.Canvas('cv',{selection:false});
   canvas.setWidth(W); canvas.setHeight(H);
+
+  function setCanvasForViewport(){
+    const vw=window.innerWidth, vh=window.innerHeight;
+    // iPad landscape / portátiles bajos: más compacto
+    if(vw>=900 && vh<=768){ W=500; H=660; }
+    else if(vw>=1200 && vh<=820){ W=540; H=720; }
+    else { W=560; H=740; }
+    canvas.setWidth(W); canvas.setHeight(H);
+    refit(); // recolocar bolso tras redimensionar
+  }
+  window.addEventListener('resize', setCanvasForViewport);
 
   // Debug
   const dbg=document.createElement('div');
@@ -27,15 +39,23 @@
   let mode=''; let bucketA=[], bucketB=[];
   let outlineSet=new Set(); let stitchSet=new Set();
   let imgSmooth=null, imgSuede=null;
+  let rootRef=null; // <-- para poder reajustar en resize
 
   // ---------- helpers ----------
   function fit(g){
-    // Ajusta el grupo AL CANVAS conservando proporción siempre
-    const m=24, maxW=W-2*m, maxH=H-2*m;
+    // márgenes algo menores y bolso un pelín más arriba
+    const mX=16, mY=10;
+    const maxW=W-2*mX, maxH=H-2*mY;
     const w=g.width||g.getScaledWidth(), h=g.height||g.getScaledHeight();
     const s=Math.min(maxW/w, maxH/h);
-    g.set({ scaleX:s, scaleY:s, left:(W-w*s)/2, top:(H-h*s)/2, selectable:false, evented:false });
+    g.scale(s);
+    g.set({
+      left:(W-w*s)/2,
+      top: Math.max(0,(H-h*s)/2 - 8), // 8px hacia arriba
+      selectable:false, evented:false
+    });
   }
+  function refit(){ if(rootRef){ fit(rootRef); canvas.requestRenderAll(); } }
   function walk(arr,fn){ (function rec(a){ a.forEach(o=>{ fn(o); if(o._objects&&o._objects.length) rec(o._objects); }); })(arr); }
   function leafs(root){ const out=[]; walk([root], o=>{ if(o._objects&&o._objects.length) return; if(o.type==='image') return; out.push(o); }); return out; }
   function idsMap(arr){ const map={}; walk(arr,o=>{ if(o.id) map[o.id]=o; }); return map; }
@@ -299,27 +319,26 @@
   Promise.all([loadImg(TX.smooth), loadImg(TX.suede)]).then(([a,b])=>{ imgSmooth=a; imgSuede=b; });
 
   fabric.loadSVGFromURL(SVG,(objs,opts)=>{
-    const root=fabric.util.groupSVGElements(objs,opts);
-    fit(root); canvas.add(root);
-    collectStitch(root);
-    styleAndCollectOutlines(root);
-    buildBuckets(root);
-    paint();
+    rootRef=fabric.util.groupSVGElements(objs,opts);
+    fit(rootRef); canvas.add(rootRef);
+    setCanvasForViewport(); // calcula tamaño ideal por viewport
 
-    // Ajuste por si el canvas se reescala por CSS en móvil
-    window.addEventListener('resize', ()=>{ fit(root); canvas.requestRenderAll(); });
+    collectStitch(rootRef);
+    styleAndCollectOutlines(rootRef);
+    buildBuckets(rootRef);
+    paint();
   },(item,obj)=>{ obj.selectable=false; });
 
   // UI
   ['change','input'].forEach(ev=>{
-    ui.colA?.addEventListener(ev, paint);
-    ui.colB?.addEventListener(ev, paint);
-    ui.texA?.addEventListener(ev, paint);
-    ui.texB?.addEventListener(ev, paint);
+    ui.colA.addEventListener(ev, paint);
+    ui.colB.addEventListener(ev, paint);
+    ui.texA.addEventListener(ev, paint);
+    ui.texB.addEventListener(ev, paint);
     if(ui.stitch) ui.stitch.addEventListener(ev, paint);
   });
 
-  ui.dl?.addEventListener('click', ()=>{
+  ui.dl.addEventListener('click', ()=>{
     const data=canvas.toDataURL({format:'png',multiplier:1.5});
     const a=document.createElement('a'); a.href=data; a.download='bolso-preview.png'; a.click();
   });
@@ -338,7 +357,7 @@
     });
   }
 
-  // Snapshot para PDF
+  // snapshot para PDF/form
   window.getWizardSnapshot = function(){
     const cfg = {
       model:'bucket-01',
