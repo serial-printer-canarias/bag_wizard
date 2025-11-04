@@ -9,10 +9,10 @@
   :root{
     --bg:#f7f7f9; --ink:#221E1B; --terra:#8C5A45; --rose:#E7BFC2; --line:#eaeaea;
     --rightCol: 420px;
-    --gap-logo-title: 40px;   /* MÁS aire entre logo y título */
+    --gap-logo-title: 40px;   /* aire logo ↔ título */
     --gap-title-options: 16px;/* título ↔ opciones */
-    --desk-gap: 14px;         /* columna derecha MÁS cerca del bolso */
-    --nudge-left: -30px;      /* empujar bloque hacia el centro (izquierda) */
+    --desk-gap: 8px;          /* columnas MÁS cerca */
+    --nudge-left: -56px;      /* empuja bloque hacia el bolso/centro */
     --m-gap: 22px;
   }
 
@@ -33,15 +33,15 @@
     align-items:start;
   }
 
-  /* Canvas: aún más pequeño para que se vea entero sin scroll */
+  /* Canvas: ~15% más pequeño */
   .stage{display:flex;justify-content:flex-start;align-items:flex-start}
   #cv{
     display:block;background:transparent;border:none;border-radius:0;
-    width:clamp(300px, 40vw, 600px);  /* ↓ antes 44vw/640 */
+    width:clamp(260px, 34vw, 510px); /* ↓ antes ~40vw/600 */
     height:auto;margin-top:4px;
   }
 
-  /* Bloque: centrado entre sí, más pegado al bolso y desplazado hacia el centro */
+  /* Bloque derecho compacto, centrado entre sí y más pegado al bolso */
   .side{
     display:flex;flex-direction:column;align-items:center;text-align:center;
     gap:var(--gap-title-options);align-self:center;margin-left:var(--nudge-left);
@@ -68,7 +68,7 @@
   .actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:6px}
   button{cursor:pointer;border-radius:12px;padding:9px 14px;font-weight:600;border:1px solid var(--line);background:var(--rose);color:#5a3a2c}
 
-  /* Formulario (sin cambios) */
+  /* Formulario */
   .order{max-width:980px;margin:40px auto 0;background:transparent;border:none;padding:0}
   .order h2{
     margin:0 0 20px 0;
