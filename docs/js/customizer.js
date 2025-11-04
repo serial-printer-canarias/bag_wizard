@@ -30,25 +30,31 @@
 
   // ---------- helpers ----------
   function fit(g){
-    // Más aire para que el bolso se vea siempre entero y más pequeño de inicio
-    const M = Math.max(36, Math.round(Math.min(W, H) * 0.10)); // ~10% del canvas
+    // Más aire y escala UNIFORME para evitar deformaciones
+    const M = Math.max(36, Math.round(Math.min(W, H) * 0.10)); // ~10% margen
     const maxW = W - 2*M, maxH = H - 2*M;
 
-    const w = g.width || g.getScaledWidth();
-    const h = g.height || g.getScaledHeight();
+    // Dimensiones "crudas" del grupo (sin depender de escalas previas)
+    const w0 = g.width || g.getScaledWidth();
+    const h0 = g.height || g.getScaledHeight();
 
-    const base = Math.min(maxW / w, maxH / h);
-    const EXTRA = 0.82;                    // encoge ~18% adicional (≈15–20%)
+    // Escala base para encajar y un extra para que arranque más pequeño
+    const base = Math.min(maxW / w0, maxH / h0);
+    const EXTRA = 0.78; // ≈ 22% más pequeño (ajustable)
     const s = base * EXTRA;
 
-    g.scale(s);
+    // Forzar escala uniforme y centrar
+    g.set({ scaleX:s, scaleY:s });
+    const w = w0 * s, h = h0 * s;
     g.set({
-      left:(W - w*s)/2,
-      top: (H - h*s)/2,
+      left:(W - w)/2,
+      top:(H - h)/2,
       selectable:false,
       evented:false
     });
+    g.setCoords();
   }
+
   function walk(arr,fn){ (function rec(a){ a.forEach(o=>{ fn(o); if(o._objects&&o._objects.length) rec(o._objects); }); })(arr); }
   function leafs(root){ const out=[]; walk([root], o=>{ if(o._objects&&o._objects.length) return; if(o.type==='image') return; out.push(o); }); return out; }
   function idsMap(arr){ const map={}; walk(arr,o=>{ if(o.id) map[o.id]=o; }); return map; }
@@ -221,7 +227,7 @@
         if(isOutlineStroke(o)){
           o.set({fill:'none', stroke:'#111', strokeWidth:1.4, strokeLineCap:'round', strokeLineJoin:'round', strokeUniform:true, opacity:1});
         }else{
-          o.set({fill:'#111', stroke:null, strokeWidth:0, opacity:1});
+          o.set({fill:'#111', stroke:null, strokeWidth:0});
         }
         if(o.group) bringChildToTop(o.group,o);
       }
@@ -334,15 +340,33 @@
     const data=canvas.toDataURL({format:'png',multiplier:1.5});
     const a=document.createElement('a'); a.href=data; a.download='bolso-preview.png'; a.click();
   });
-  ui.save.addEventListener('click', ()=>{
-    ui.hidden.value = JSON.stringify({
+
+  /* ← guardia para no romper si “Ver JSON” no existe */
+  if(ui.save){
+    ui.save.addEventListener('click', ()=>{
+      ui.hidden.value = JSON.stringify({
+        model:'bucket-01',
+        mode,
+        A:{ texture: ui.texA.value, color: ui.colA.value },
+        B:{ texture: ui.texB.value, color: ui.colB.value },
+        C:{ texture:'none', color: ui.stitch ? ui.stitch.value : '#111111' },
+        version:'1.0.1'
+      });
+      alert(ui.hidden.value);
+    });
+  }
+
+  // Snapshot para el formulario
+  window.getWizardSnapshot = function(){
+    const cfg = {
       model:'bucket-01',
       mode,
       A:{ texture: ui.texA.value, color: ui.colA.value },
       B:{ texture: ui.texB.value, color: ui.colB.value },
       C:{ texture:'none', color: ui.stitch ? ui.stitch.value : '#111111' },
       version:'1.0.1'
-    });
-    alert(ui.hidden.value);
-  });
+    };
+    const png = canvas.toDataURL({ format:'png', multiplier: 1.5 });
+    return { png, config: cfg };
+  };
 })();
