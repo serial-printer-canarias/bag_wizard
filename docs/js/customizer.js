@@ -29,22 +29,23 @@
   let imgSmooth=null, imgSuede=null;
 
   // ---------- helpers ----------
-  // VOLVEMOS a ajustar con las dimensiones nativas del grupo (viewBox),
-  // manteniendo proporción y centrando. Esto respeta tu SVG tal cual lo dejaste.
   function fit(g){
+    // Ajuste fino del "ancho": usamos boundingRect real y subimos FILL.
     const isMob = window.matchMedia('(max-width: 768px)').matches;
-    const PAD       = isMob ? 18 : 26;     // margen limpio
-    const FILL_MOB  = 0.92;                // ocupa un 92% del alto/ancho útil en móvil
-    const FILL_DESK = 0.88;                // ocupa ~88% en desktop (como en tu foto)
+    const PAD       = isMob ? 18 : 22;       // margen
+    const FILL_MOB  = 0.94;                  // ocupar más ancho en móvil
+    const FILL_DESK = 0.96;                  // ocupar más ancho en desktop
     const FILL = isMob ? FILL_MOB : FILL_DESK;
 
     const maxW = W - 2*PAD;
     const maxH = H - 2*PAD;
 
-    // medimos en escala 1 usando el tamaño nativo del grupo (viewBox)
+    // reset a escala 1 para medir bien
     g.set({ scaleX:1, scaleY:1, left:0, top:0 });
-    const w = g.width  || g.getScaledWidth();
-    const h = g.height || g.getScaledHeight();
+    // medir con boundingRect para coger ancho/alto reales
+    const r0 = g.getBoundingRect(true, true);
+    const w = r0.width > 0 ? r0.width : (g.width || 1);
+    const h = r0.height> 0 ? r0.height: (g.height|| 1);
 
     const s = Math.min(maxW/w, maxH/h) * FILL;
 
@@ -325,7 +326,7 @@
   fabric.loadSVGFromURL(SVG,(objs,opts)=>{
     rootObj=fabric.util.groupSVGElements(objs,opts);
     canvas.add(rootObj);
-    fit(rootObj); // ← encaje según viewBox/nativo (como en tu foto)
+    fit(rootObj);
 
     collectStitch(rootObj);
     styleAndCollectOutlines(rootObj);
@@ -333,7 +334,6 @@
     paint();
   },(item,obj)=>{ obj.selectable=false; });
 
-  // reencajar al cambiar tamaño de ventana
   window.addEventListener('resize', ()=>{
     if(!rootObj) return;
     fit(rootObj);
