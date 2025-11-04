@@ -16,7 +16,7 @@
 
   // Canvas base
   const canvas=new fabric.Canvas('cv',{ selection:false });
-  // Medidas por defecto (fallback)
+  // Fallback
   let W=600, H=800;
 
   // Debug
@@ -28,45 +28,38 @@
   let mode=''; let bucketA=[], bucketB=[];
   let outlineSet=new Set(); let stitchSet=new Set();
   let imgSmooth=null, imgSuede=null;
-  let rootObj=null; // guardamos el grupo SVG para reencajar en resize
+  let rootObj=null;
 
   // ---------- helpers ----------
   function syncCanvasToCSS(){
-    // Lee tamaño real del canvas en pantalla para evitar deformaciones por CSS
     const el = canvas.getElement();
     const cssW = Math.max(50, el.clientWidth || W);
     const cssH = Math.max(50, el.clientHeight || H);
     const dpr  = window.devicePixelRatio || 1;
 
-    // Igualamos el “backing store” al tamaño visible para que no lo estire el navegador
     canvas.setDimensions({ width: cssW * dpr, height: cssH * dpr });
     canvas.setViewportTransform([dpr,0,0,dpr,0,0]);
-    // Actualizamos referencias W/H
     W = cssW; H = cssH;
 
     if(rootObj){ fit(rootObj); canvas.requestRenderAll(); }
   }
 
   function fit(g){
-    // Márgenes y escala UNIFORME (proporciones originales)
-    const M = Math.max(28, Math.round(Math.min(W,H)*0.08)); // ~8% de margen
+    // Margen más fino (≈6%) y escala uniforme
+    const M = Math.max(24, Math.round(Math.min(W,H)*0.06));
     const maxW = W - 2*M;
     const maxH = H - 2*M;
 
-    // Dimensiones sin depender de escalas previas
-    // Usamos bounding rect para ser inmunes a escalas internas
     const r0 = g.getBoundingRect(true,true);
     const w0 = r0.width;
     const h0 = r0.height;
 
     const base = Math.min(maxW / w0, maxH / h0);
-    const EXTRA = 0.70; // más pequeño de inicio (≈30% extra de aire)
+    const EXTRA = 0.92; // entra entero, tamaño equilibrado
     const s = base * EXTRA;
 
-    // Escala uniforme SIEMPRE
     g.set({ scaleX:s, scaleY:s, originX:'left', originY:'top' });
 
-    // Recalculamos bbox ya escalado para centrar
     const w = w0 * s, h = h0 * s;
     g.set({
       left: (W - w)/2,
@@ -343,11 +336,9 @@
   // Cargar SVG
   fabric.loadSVGFromURL(SVG,(objs,opts)=>{
     rootObj=fabric.util.groupSVGElements(objs,opts);
-    // aseguramos estado limpio antes de medir
     rootObj.set({ scaleX:1, scaleY:1, left:0, top:0 });
     canvas.add(rootObj);
 
-    // Sincroniza tamaños reales del canvas y encaja
     syncCanvasToCSS();
 
     collectStitch(rootObj);
@@ -384,7 +375,6 @@
     });
   }
 
-  // Snapshot para formulario
   window.getWizardSnapshot = function(){
     const cfg = {
       model:'bucket-01',
@@ -398,8 +388,6 @@
     return { png, config: cfg };
   };
 
-  // Re‐encajar en resize (evita estiramientos en móvil/escritorio)
   window.addEventListener('resize', syncCanvasToCSS);
-  // Por si el canvas ya tiene tamaño CSS al llegar aquí
   setTimeout(syncCanvasToCSS, 0);
 })();
